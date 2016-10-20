@@ -138,7 +138,7 @@ for pathCatchement in ListWithWWTPCatchments:
     # Trial with .txt (klappt)
     #subp.call(r'C:/Users/eggimasv/AppData/Local/Apps/2.0/BN23RV48.G12/9DDGL0P7.2AJ/segm..tion_c23e290fb11c064b_0001.0000_eb3ca996fc44ae0f/SEGME.exe -c run(in=\"C:\_scraop\Script.txt\");');
 
-
+ 
     #Works
     inputCodeBackSlash = r'C:\Users\eggimasv\AppData\Local\Apps\2.0\BN23RV48.G12\9DDGL0P7.2AJ\segm..tion_c23e290fb11c064b_0001.0000_eb3ca996fc44ae0f\SEGME.exe -c geom.splitpolysbylines(in=\"Q:\Abteilungsprojekte\eng\SWWData\Eggimann_Sven\07-Fallbeispiele\02_GIS_BERN\304_Kallnach\304Kallnach\settlementArea.shp\", line=\"Q:\Abteilungsprojekte\eng\SWWData\Eggimann_Sven\07-Fallbeispiele\02_GIS_BERN\304_Kallnach\304Kallnach\streetRailMerge.shp\", out=\"Q:\Abteilungsprojekte\eng\SWWData\Eggimann_Sven\07-Fallbeispiele\02_GIS_BERN\304_Kallnach\304Kallnach\Z_THATSI.shp\");'                             
     #inputCodeBackSlash = r'C:/Users/eggimasv/AppData/Local/Apps/2.0/BN23RV48.G12/9DDGL0P7.2AJ/segm..tion_c23e290fb11c064b_0001.0000_eb3ca996fc44ae0f/SEGME.exe -c geom.splitpolysbylines(in=\"Q:/Abteilungsprojekte/eng/SWWData/Eggimann_Sven/07-Fallbeispiele/02_GIS_BERN/304_Kallnach/304Kallnach/settlementArea.shp\", line=\"Q:/Abteilungsprojekte/eng/SWWData/Eggimann_Sven/07-Fallbeispiele/02_GIS_BERN/304_Kallnach/304Kallnach/streetRailMerge.shp\", out=\"Q:/Abteilungsprojekte/eng/SWWData/Eggimann_Sven/07-Fallbeispiele/02_GIS_BERN/304_Kallnach/304Kallnach/Z_THATSddI.shp\");'                             
