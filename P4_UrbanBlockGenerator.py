@@ -96,6 +96,7 @@ for pathCatchement in ListWithWWTPCatchments:
     pathStreetUSU = str(pathCatchement) + "\\" + "street_simplified_split.shp"
     pathRailwayUSU = str(pathCatchement) + "\\" + "railwayNetwork.shp"
     pathSettlementArea = str(pathCatchement) + "\\" + "settlementArea.shp"
+    pathBuildings = str(pathCatchement) + "\\" + "buildings_inhabited.shp"
     
     #print("pathStreetUSU " + str(pathStreetUSU))
     #print("pathRailwayUSU " + str(pathRailwayUSU))
@@ -182,7 +183,8 @@ for pathCatchement in ListWithWWTPCatchments:
 
 
     #------------------------------------------------------------------------------------------------------------------------
-    #Delete by selection
+    # 5. Delete all which are smaller than 300 m2
+    #------------------------------------------------------------------------------------------------------------------------
 
     # Set environment settings
     arcpy.env.workspace = in_table
@@ -207,6 +209,23 @@ for pathCatchement in ListWithWWTPCatchments:
     #  execute DeleteFeatures to remove the selected features.
     if int(arcpy.GetCount_management(tempLayer).getOutput(0)) > 0:
         arcpy.DeleteFeatures_management(tempLayer)
-
     
-
+    #------------------------------------------------------------------------------------------------------------------------
+    # 6. Delete all which ahve no hosue on it
+    #------------------------------------------------------------------------------------------------------------------------
+    tempLayer2 = "smallUSU_inhabited"
+    outFeatures2 = str(pathCatchement) + "\\" + "USU_cleaned_inhabited" + ".shp"
+    outFeatures3 = str(pathCatchement) + "\\" + "USU_cleaned_inhabited_NEW" + ".shp"
+    arcpy.CopyFeatures_management(outFeatures, outFeatures2)      #Make CopY
+    arcpy.MakeFeatureLayer_management(outFeatures2, tempLayer2)   # Execute MakeFeatureLayer
+    
+    arcpy.SelectLayerByLocation_management(tempLayer2, 'intersect', pathBuildings)
+    
+    # If features matched criteria write them to a new feature class
+    matchcount = int(arcpy.GetCount_management(tempLayer2)[0]) 
+    if matchcount == 0:
+        print('no features matched spatial and attribute criteria')
+    else:
+        arcpy.CopyFeatures_management(tempLayer2, outFeatures3)
+        
+        
