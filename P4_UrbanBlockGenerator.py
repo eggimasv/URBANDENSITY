@@ -211,13 +211,12 @@ for pathCatchement in ListWithWWTPCatchments:
         arcpy.DeleteFeatures_management(tempLayer)
     
     #------------------------------------------------------------------------------------------------------------------------
-    # 6. Delete all which ahve no hosue on it
+    # 6. Export only those USU with buildings on it
     #------------------------------------------------------------------------------------------------------------------------
     tempLayer2 = "smallUSU_inhabited"
-    outFeatures2 = str(pathCatchement) + "\\" + "USU_cleaned_inhabited" + ".shp"
     outFeatures3 = str(pathCatchement) + "\\" + "USU_cleaned_inhabited_NEW" + ".shp"
-    arcpy.CopyFeatures_management(outFeatures, outFeatures2)      #Make CopY
-    arcpy.MakeFeatureLayer_management(outFeatures2, tempLayer2)   # Execute MakeFeatureLayer
+    
+    arcpy.MakeFeatureLayer_management(outFeatures, tempLayer2)   # Execute MakeFeatureLayer
     
     arcpy.SelectLayerByLocation_management(tempLayer2, 'intersect', pathBuildings)
     
@@ -228,4 +227,115 @@ for pathCatchement in ListWithWWTPCatchments:
     else:
         arcpy.CopyFeatures_management(tempLayer2, outFeatures3)
         
-        
+    #------------------------------------------------------------------------------------------------------------------------
+    # 7. Generate USU_ID Field and assign USU_ID
+    #------------------------------------------------------------------------------------------------------------------------
+    #Genere USU_ID FIELD
+    field_name_USU_ID = "USU_ID"
+    field_type = "FLOAT"   
+    arcpy.AddField_management(outFeatures3, field_name_USU_ID, "FLOAT") 
+
+
+    # Loop through the rows in the attribute table
+    uniqueID = 0
+    
+    cur = arcpy.UpdateCursor(outFeatures3)
+    
+    for row in cur:
+        uniqueID += 1
+        row.setValue(field_name_USU_ID, uniqueID)      # Assign value
+        cur.updateRow(row)                      # Apply the change
+    
+    #------------------------------------------------------------------------------------------------------------------------
+    # 8. Create Centroid File of USU with ID
+    USU_Centroids = str(pathCatchement) + "\\" + "USU_Centroids" + ".shp"
+    arcpy.FeatureToPoint_management(outFeatures3, USU_Centroids, "CENTROID")  
+    
+    #------------------------------------------------------------------------------------------------------------------------
+    # 9. Spatial Intersect to add USU_ID on buildings
+    #------------------------------------------------------------------------------------------------------------------------
+    outFeatures4 = str(pathCatchement) + "\\" + "USU_buildings_sj_ID" + ".shp"
+    arcpy.Intersect_analysis([outFeatures3, pathBuildings], outFeatures4)
+    
+    #------------------------------------------------------------------------------------------------------------------------
+    # 10. Summary Statistics for USU
+    #------------------------------------------------------------------------------------------------------------------------
+    summaryTable = str(pathCatchement) + "\\" + "USU_Summary"
+    case_field = "USU_ID"
+    statistics_fields = [["Einw_GEB", "SUM"]]
+    
+    arcpy.Statistics_analysis(outFeatures4, summaryTable, statistics_fields, field_name_USU_ID)
+    
+    
+    
+    
+    #------------------------------------------------------------------------------------------------------------------------
+    # 10. Merge Statistics with Centroid File
+    #------------------------------------------------------------------------------------------------------------------------
+     
+    #USU_Centroids
+    
+    #------------------------------------------------------------------------------------------------------------------------
+    # 11. Merge with single houses oustide and definte them as USU
+    #------------------------------------------------------------------------------------------------------------------------
+    
+    
+    
+    # MERGE SINGLE BUILDINGS
+    #outFeatures3 = 
+    #arcpy.Merge_management ([outFeatures3 + ], output, {field_mappings}
+    #RE ASSING ID)
+    
+    
+    
+    
+    
+    
+    
+    '''#------------------------------------------------------------------------------------------------------------------------
+    # 7. Export only those USU with buildings on it
+    #------------------------------------------------------------------------------------------------------------------------
+    tempLayer4 = "USU_centroid"
+    outFeatures4 = str(pathCatchement) + "\\" + "USU_gravity_point" + ".shp"
+    outPutUSU_Statistics = str(pathCatchement) + "\\" + "USU_gravity_point_statistics" + ".dbf"
+    
+    arcpy.MakeFeatureLayer_management(outPutUSU_Statistics, tempLayer4)   # Execute MakeFeatureLayer
+    
+    arcpy.Statistics_analysis(pathBuildings, outPutUSU_Statistics, pathBuildings, {case_field})
+    
+    
+    # Select all Buildling points within USU
+    
+    
+    # Calculate weight
+    
+    
+    
+    # Store Statistic al Data (e.g. Floor, buildling area...)
+    # Nr of Buildings
+    # Average Area
+    # ....
+    '''
+ 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
