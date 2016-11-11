@@ -3272,7 +3272,7 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
                                         archPathMST = archPath                                                              # But if there is a street connection, take the street distance
                                     else:
                                         archPathMST = [[idp0, [idp1, realDistance, slopeMST]]]    
-                                ''' 
+                                '''
     
                             # Change Street Graph and append edges of a* algorithm
                             if changeStreetGraph == 1:
@@ -4417,7 +4417,6 @@ def writeWWTPs(shapefile_path, pointListNear):
     """
     from arcpy import env
     env.workspace = shapefile_path
-    
     arcpy.AddField_management(shapefile_path, "ID_scratch", "FLOAT")
     arcpy.DeleteField_management(shapefile_path, "Id")              # Delete automatically created field
     arcpy.AddField_management(shapefile_path, "ID", "FLOAT")
@@ -4433,11 +4432,6 @@ def writeWWTPs(shapefile_path, pointListNear):
         rows.updateRow(row)
         cnt += 1
     return
-
-
-
-
-
 
 def writeStartnode(shapefile_path, startnodeID):
     """
@@ -6056,7 +6050,6 @@ def readInRasterPoints(pathRasterPoints):
     Output Arguments:
     demPnts                --    DEM Points
     """
-    print("READ IN RASTER PINT SNIP FUNCTIONS")
     txtFileList = readLines(pathRasterPoints)  
     demPnts = []
     for i in txtFileList:
@@ -6318,7 +6311,7 @@ def getStatistics(startnode, sewers, pointsPrim, aggregatetPoints, WWTPs, edgeLi
                     break
 
     print("Total public pipe Length:  " + str(totalPublicPipeLength))
-    print("Total private pipe Length: " + str(totalPublicPipeLength))
+    print("Total private pipe Length: " + str(totalPrivatePipeLenth))
         
     # Calculate degree of centralization
 
@@ -6413,15 +6406,6 @@ def getStatistics(startnode, sewers, pointsPrim, aggregatetPoints, WWTPs, edgeLi
     # Statistics
     statistics = [startnode, sources, sinks, degCen, degCenWeighted, nrOfNeighboursDensity, totalPublicPipeLength, totalPrivatePipeLenth, avreageTrenchDepth, averageHeight, averageWWTPSize, medianWWTPSize, p_to10EW, p_10to100EW, p_100to1000EW, p_over1000EW]
     return statistics
-
-
-
-
-
-
-
-
-
 
 
 

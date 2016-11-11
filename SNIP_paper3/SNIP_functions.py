@@ -15,7 +15,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 
-## You should have received a copy of the GNU General Public License
+# You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 #    
 # The Djikstra and a* algorithm are adapted from Hetland (2010).
@@ -31,18 +31,32 @@
 #
 # Contact:   sven.eggimann@eawag.ch
 # Version    1.0
-# Date:      1.1.2015
+# Date:      1.07.2015
 # Autor:     Eggimann Sven
 # ======================================================================================
 
 # Imports
 import arcpy
-import os
-import math, sys, operator
+import os, math, sys, operator
 from datetime import datetime
-#from SNIP_astar import *
+from SNIP_astar import *
 from SNIP_costs import *
-#from compiler.ast import Node
+import random
+
+# Iterate Folders   
+def getAllFolders(mainFolder):
+    folderPaths = []
+    #Get the folders
+    folderList = os.listdir(mainFolder)
+    folderList.sort()
+    for folder in folderList:
+        print("FOLDER: " + str(folder))
+        folderPaths.append(mainFolder + "\\" + folder + "\\")
+    return folderPaths
+
+
+#-----------------------------------------
+
 
 def distanceCalc2d(p0, p1):
     """
@@ -73,12 +87,49 @@ def distanceCalc3d(p0, p1):
     distancePlanar = math.hypot(xp0 - xp1, yp0 - yp1) 
 
     if distancePlanar == 0:
+        arcpy.AddMessage("A: " + str(p0))
+        arcpy.AddMessage("H: " + str(p1))
+        arcpy.AddMessage(distancePlanar)
         raise Exception("ERROR: DISTANCE TO ITSELF is calculated")
         return 0, 0, 0  # Distance zero is returned
 
     heightDiff = zTo - zFrom
     distance = math.sqrt(pow(distancePlanar, 2) + pow(heightDiff, 2))
     slope = (float(heightDiff) / float(distancePlanar)) * 100           # Slope in %
+    
+    return distance, slope, heightDiff
+
+def distanceCalc3dThirdPaper(p0, p1):
+    """
+    This functions calculates the euclidian distance in 3d space.
+
+    Input Arguments: 
+    p0, p1                --    Two points
+    
+    Output Arguments:
+    distance              --    Distance between the points
+    slope                 --    Slope between the two points
+    heightDiff            --    Height difference betwen the two points
+    """
+    xp0, xp1, yp0, yp1, zFrom, zTo = p0[0], p1[0], p0[1], p1[1], p0[2], p1[2]
+    distancePlanar = math.hypot(xp0 - xp1, yp0 - yp1) 
+
+    if distancePlanar == 0:
+        arcpy.AddMessage("A: " + str(p0))
+        arcpy.AddMessage("H: " + str(p1))
+        arcpy.AddMessage(distancePlanar)
+        raise Exception("ERROR: DISTANCE TO ITSELF is calculated")
+        return 0, 0, 0  # Distance zero is returned
+
+    heightDiff = zTo - zFrom
+    distance = math.sqrt(pow(distancePlanar, 2) + pow(heightDiff, 2))
+    slope = (float(heightDiff) / float(distancePlanar)) * 100           # Slope in %
+    
+    # III Paper 19.11.2015
+    if heightDiff < 0:
+        distanceWeitzingIIIpaper = 1000
+        distance = distance * distanceWeitzingIIIpaper
+    
     return distance, slope, heightDiff
 
 def fastCopyNodes(nodes):
@@ -175,24 +226,6 @@ def assignHighAggregatedNodes(aggregatetPoints, rasterPoints, rasterSize, minTD)
         withHeith.append(z)
     return withHeith
 
-def resetNodes(nodes, resetPnts, wtpToDelet):
-    """
-    This function sets the flow in a node to zero. 
-    
-    Input Arguments: 
-    nodes        --    nodes
-    resetPnts    --    list with nodes to reset flow
-    wtpToDelet   --    WWTP from which the breath search was made ??? Really Needed?
-    
-    Output Arguments:
-    nodes         --    edges
-    """
-    for i in resetPnts:
-        for pnt in nodes:
-            if pnt[0] == i and pnt[0] != wtpToDelet:
-                pnt[4] = 0
-                break
-    return nodes
 
 def getFlowInitial(nodesFromNetwork, nodesToNetwork, nodes, flowWWFrom, flowWWTO, notInaNetworkBeforeConnection):
     """
@@ -299,7 +332,7 @@ def densityBasedSelection(aggregatedNodes, tileSize):
     nrOfTilesVertical = range(int(float(height) / float(tileSize)) + 1)
 
     squares, line, IdNr = {} , -1, -1  # Dictionary to store squres { sqrID: (x, y)},  Iterators
-
+    
     for tile in nrOfTilesVertical:
         line += 1
         row = -1
@@ -313,15 +346,17 @@ def densityBasedSelection(aggregatedNodes, tileSize):
         nrOfPnts = 0
         for i in aggregatedNodes:
             if i[1] >= squares[entry][0] and i[1] < (squares[entry][0] + tileSize) and i[2] > (squares[entry][1] - tileSize) and i[2] <= squares[entry][1]:
-                nrOfPnts += 1
+                #nrOfPnts += 1
+                nrOfPnts += i[8] # Summarize flow
         squares[entry][2] = nrOfPnts
+
     
     # Get coordinates with highest density
     maxNrofTiles = 0
     for entry in squares:
         if squares[entry][2] > maxNrofTiles:
             topLefTileX, topLefTileY, maxNrofTiles = squares[entry][0], squares[entry][1], squares[entry][2]
-    
+
     # Iterate list and select first point which is in highest density tile
     for i in aggregatedNodes:
         if i[1] >= topLefTileX and i[1] <= topLefTileX + tileSize and i[2] >= topLefTileY - tileSize and i[2] <= topLefTileY:
@@ -1451,7 +1486,7 @@ def getClosestNetworkWWTP(nodes, WWTPs, sewers, pZero, checkBackConnectionID):
     return closestWWTPinNet, cordWWTPinNet, pathInClosestNetwork
 
 
-def flowIfSameCheck(WWTPs, aggregatetPoints):
+def flowIfSameCheck(WWTPs, aggregatetPoints, ConnectionRateToReach):
     '''
     This function checks wheter after the SNIP calculation there was lost any flow. This is a controlling function.
     In case the flow is no the same throw an error (except when a connection is enforced and the flow cannot be the same).
@@ -1460,24 +1495,27 @@ def flowIfSameCheck(WWTPs, aggregatetPoints):
     WWTPs                 -    Waste water treatment plants
     aggregatetPoints      -    All aggregated nodes 
     '''
-    sumFlowWWTP, sumFlowAggregated = 0, 0
     
-    for i in WWTPs:
-        sumFlowWWTP +=i[1]
-    
-    for i in aggregatetPoints:
-        sumFlowAggregated += i[8]
-
-    sumFlowWWTP = round(sumFlowWWTP, 3)
-    sumFlowAggregated = round(sumFlowAggregated, 3)
-    
-    if sumFlowAggregated != sumFlowWWTP:
-        print("sumFlowWWTP: " + str(sumFlowWWTP))
-        print("sumFlowAggregated: " + str(sumFlowAggregated))
-        raise Exception("Error: The total flow before SNIP and after SNIP is not identical.")
+    if ConnectionRateToReach != 1:
+        arcpy.AddMessage("Cannot compare flow because not everythign is connected")
+        
     else:
-        _ = 0
-        #arcpy.AddMessage("The total flow before SNIP and after SNIP is identical.")
+        sumFlowWWTP, sumFlowAggregated = 0, 0
+        
+        for i in WWTPs:
+            sumFlowWWTP +=i[1]
+        
+        for i in aggregatetPoints:
+            sumFlowAggregated += i[8]
+    
+        sumFlowWWTP = round(sumFlowWWTP, 3)
+        sumFlowAggregated = round(sumFlowAggregated, 3)
+        
+        if sumFlowAggregated != sumFlowWWTP:
+            arcpy.AddMessage("sumFlowWWTP: " + str(sumFlowWWTP))
+            arcpy.AddMessage("sumFlowAggregated: " + str(sumFlowAggregated))
+            arcpy.AddMessage("Error: The total flow before SNIP and after SNIP is not identical.")
+            raise Exception("Error: The total flow before SNIP and after SNIP is not identical.")
 
 def calcZValue(aggregatetPoints, forceZ, iterativeCostCalc, hypoWWTPcorrectFlow, WWTPs):
     '''
@@ -1496,7 +1534,6 @@ def calcZValue(aggregatetPoints, forceZ, iterativeCostCalc, hypoWWTPcorrectFlow,
     else:
         sinks = len(WWTPs)
     degCen = round((float(sources) - float(sinks)) / float(sources), 4)   
-    #arcpy.AddMessage("Degree of Centralization (non-Weighted): " + str(degCen))
     return degCen
 
 def calcZweighted(forceZ, iterativeCostCalc, hypoWWTPcorrectFlow, sewers, aggregatetPoints, WWTPs):
@@ -1514,20 +1551,15 @@ def calcZweighted(forceZ, iterativeCostCalc, hypoWWTPcorrectFlow, sewers, aggreg
     '''
     if forceZ == True and iterativeCostCalc == 1:
         listWWTPwithAggregatedNodes = getAggregatedNodesinListWWTP(hypoWWTPcorrectFlow, sewers, aggregatetPoints) # Get aggregated nodes
-        #arcpy.AddMessage("listWWTPwithAggregatedNodes A: " + str(listWWTPwithAggregatedNodes))
     else:
         listWWTPwithAggregatedNodes = getAggregatedNodesinListWWTP(WWTPs, sewers, aggregatetPoints) # Get aggregated nodes
-        #arcpy.AddMessage("listWWTPwithAggregatedNodes B: " + str(listWWTPwithAggregatedNodes))
     
     sumFlow, weightedTerm = 0, 0
     for i in listWWTPwithAggregatedNodes:
         sumFlow += i[1]
         weightedTerm += float((i[1]/i[2]))
         
-    #arcpy.AddMessage("sumFlow: " + str(sumFlow))       
-    #arcpy.AddMessage("weightedTerm: " + str(weightedTerm))       
     degCenWeighted = (sumFlow - weightedTerm) / sumFlow
-    #arcpy.AddMessage("Degree of Centralization (Weighted) COCA COLULATION: " + str(degCenWeighted))
     return degCenWeighted
 
 def turnNodesIntoWWTP(WWTPs, nodes, aggregatetPoints, sewers):
@@ -1860,9 +1892,34 @@ def selectLowestNode(aggregatetPoints):
     """
     height = 9999999999
     for i in aggregatetPoints:
-        if i[8] < height:
-            lowestNode, height = i[0], i[3]
-    return lowestNode
+        if i[3] < height:
+            lowestNode, lowestX, lowestY, lowestZ = i[0], i[1], i[2], i[3]
+            height = lowestZ
+            
+    return lowestNode, lowestX, lowestY, lowestZ
+
+def selectRandomStartingNodes(startingNodes, aggregatetPoints, numberOfSNIPruns):
+    """
+    This function selects random starting nodes
+
+    Input Arguments: 
+    startingNodes       --    List with start nodes
+    aggregatetPoints    --    Nodes
+    numberOfSNIPruns    --    Number of random startnodes to choose
+    
+    Output Arguments:
+    startingNodes           --    List with start nodes
+    """
+
+    listLength = len(aggregatetPoints)
+    cnt = 0
+    arcpy.AddMessage(aggregatetPoints)
+    while cnt <= numberOfSNIPruns:
+        randomPosition = random.randint(0, listLength-1)
+        startingNodes.append([aggregatetPoints[randomPosition][0], aggregatetPoints[randomPosition][1], aggregatetPoints[randomPosition][2]]) #randomID, X, Y
+        cnt += 1
+    
+    return startingNodes
 
 def invertFlowToNearestWTP(pathtonearestWTPswap, sewers_A3, sewers):
     """
@@ -1982,9 +2039,6 @@ def costComparison(totCostI, totCostII, totCostIII, resonableCosts, costConnecti
                         wwtpSWAP, decCrit = 0, 1
                     else:
                         wwtpSWAP, decCrit = 1, 1
-
-                #if totCostII < totCostI and totCostII < totCostIII:
-                #    # Decentral would have been the cheapest option but decentral was not considered
             else:
                 if totCostIII >= totCostII: 
                     # Connection costs are higher than reasonable costs, decentral alternative can be considered
@@ -2118,7 +2172,7 @@ def loopTest(pathNearWTP, sewersNoC):
         if new[i][0] == pathNearWTP[i][0]:
             continue
         else:  
-            loops = True                    # Info: ArchPath has loops"
+            loops = True                    # Info: ArchPath has loops
             return new, loops
     loops = False
     return pathNearWTP, loops
@@ -2725,7 +2779,7 @@ def getNoLoopPath(sewers, path):
             newPath = mergeLists(part_A, part_B)                                                # Merge pathlists A & B     
             return newPath 
 
-def primCalculations(nodes, PN, allPopNodesOntheWay): 
+def primCalculations(nodes, PN, allPopNodesOntheWay, rasterSize, rasterPoints, WWTPs): 
     """
     This functions calculateds the prim distances.
     
@@ -2738,13 +2792,65 @@ def primCalculations(nodes, PN, allPopNodesOntheWay):
 
     Output Arguments:
     PN                    --    Updated PRIM Distances
-    """              
+    
+    """
+    WWTP_ID =      WWTPs[0][0] 
+    #arcpy.AddMessage("WWTPs" + str(WWTPs))        
+    #arcpy.AddMessage("allPopNodesOntheWay: " + str(allPopNodesOntheWay))
+    #prnt("..")
     for a in allPopNodesOntheWay:
         idp1, p1, _, _, _, _ = getPns(a, nodes)
+        
+        if idp1 == WWTP_ID:
+            giveSpecialWeight = True
+        else:
+            giveSpecialWeight = False
+            
         for i in PN:
             aktuelleDistanz, idp0 = i[0], i[2]                               # weighted distance, id0
             if idp0 != idp1:                                                 # If not distance to itself
-                distanz3d, _, _ = distanceCalc3d(p1, (i[3], i[4], i[5]))     # Calculate euclidian distance
+                p0 = (i[3], i[4], i[5])
+                distanz3d, _, hDiff = distanceCalc3d(p1, p0)     # Calculate euclidian distance
+                
+                #distanz3d, _, _ = distanceCalc3dThirdPaper(p1, (i[3], i[4], i[5]))     # Calculate euclidian distance
+                #distanz3d = pow(distanz3d, 0.1) / float(i[6]) #distnaz / anzahl Leute
+                #arcpy.AddMessage("idp1: " + str(idp1))
+                #arcpy.AddMessage("idp0: " + str(idp0))
+                #arcpy.AddMessage("A: " + str(p1))
+                #arcpy.AddMessage("B: " + str(p0))
+                # Cross Hill Test
+                #if distanz3d > 1000 or heightDifferencePRIM > 100:
+                #    crossHill = 1
+                #else:
+                hillHeight = 25 #m
+                
+                distanceRadiusToCheckForHill = 1500
+                if distanz3d < distanceRadiusToCheckForHill:
+                    #arcpy.AddMessage("start: " + str(p0))
+                    #arcpy.AddMessage("end: " + str(p1))
+                    crossHill = crossingHillTest(rasterSize, rasterPoints, p0, p1, hillHeight)  # Hill Cross Test
+                    #arcpy.AddMessage("CROSSHILL: " + str(crossHill))
+                    #arcpy.AddMessage(p0)
+                    #arcpy.AddMessage(p1)
+                    #prnt("..")
+                else:
+                    crossHill = True # do not check but push away
+                    
+                if crossHill == True:
+                    distanz3d = distanz3d * 30 # Distance weightning if there is a hill inbetween
+                
+                
+                if hDiff < 0:  # If Minus PUsh away
+                    #distanz3d = distanz3d * 10 # Distance Weighning if it goesdown$
+                    #distanz3d = distanz3d * 10 * 1/float(abs(hDiff)) # Distance Weighning if it goesdown --> Zuerst zum tieferen
+                    #distanz3d = distanz3d * 10 * float(abs(hDiff)) # Distance Weighning if it goesdown --> Zuerst zum tieferen
+                    #prnt(":..")
+                    if giveSpecialWeight == True:
+                        distanz3d = distanz3d # No special weight
+                    else:
+                        #distanz3d = distanz3d * distanz3d/float(abs(hDiff)) # Distance Weighning if it goesdown$
+                        distanz3d = distanz3d * 10 # Distance Weighning if it goesdown$
+                
                 if distanz3d < aktuelleDistanz:                              # Check if EMST-distance to the new node is smaller. If so, replace the information
                     i[0], i[1] = distanz3d, idp1
     return PN
@@ -2834,7 +2940,6 @@ def getAggregatedNodesinListWWTP(WWTPs, pipeNetwork, aggregatedNodes):
     listWWTPwithAggregatedNodes       --    List with wwtp where the nr of aggregated nodes is added
     """
     listWWTPwithAggregatedNodes = []  # Form: ID, total Flow, total nr of aggregated nodes
-    #arcpy.AddMessage("JUUUUUUUUUUUU " + str(WWTPs))
     for wwtp in WWTPs:
         allNodes = breathSearch(wwtp[0], pipeNetwork)
         nrOfNodes = 0           # List to store only inahbited nodes
@@ -2845,14 +2950,6 @@ def getAggregatedNodesinListWWTP(WWTPs, pipeNetwork, aggregatedNodes):
                 if i[0] == node:
                     nrOfNodes += 1
                     break
-
-        '''# scrap
-        if nrOfNodes == 0: # Hypothetical WWTP
-            listWWTPwithAggregatedNodes.append([wwtp[0], wwtp[1], nrOfNodes])
-        else:
-            listWWTPwithAggregatedNodes.append([wwtp[0], wwtp[1], nrOfNodes])
-        '''
-        # orig
         listWWTPwithAggregatedNodes.append([wwtp[0], wwtp[1], nrOfNodes])
 
     return listWWTPwithAggregatedNodes
@@ -2963,6 +3060,54 @@ def getFlowtoCalculateRC(allPopNodesOntheWay, flowFrom, flowTo, nodes):
 
     return summedFlowDecentralWWTP
                             
+def getFullCostsThirdPaper(totAnzLeute, aggregatetPoints, WWTPs, sewers, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement):
+    '''
+    This function calculates total Sewer costs (including pump) plus total WWTP costs
+    
+    Input:
+    aggregatetPoints    -    All nodes to consider
+    WWTPs               -    Waste water treatment plants
+    sewers              -    Sewer Network
+    EW_Q                -    Waste water per EW
+    wwtpLifespan        -    lifespan of wwtp
+    interestRate        -    interst rate
+    pumps               -    List with pumps
+    pumpYears           -    Pumping year
+    pricekWh            -    price per kWh
+    edgeList            -    List with edges
+    nodes               -    List with nodes
+    stricklerC          -    Strickler coefficient
+    discountYearsSewers -    Life span sewers
+    operationCosts      -    operation costs sewers
+    f_SewerCost         -    cost factor sewer
+    fc_wwtpOperation    -    cost factor wwtp
+    fc_wwtpReplacement  -    cost factor wwt
+    
+    Ouput:
+    degCen              -    Z
+    degCenWeighted      -    Z weighted
+    fullCosts           -    Total costs
+    listWWTPwithAggregatedNodes    -    All hypothetical WWTP with correct flow for z caluclations
+    '''
+    #hypotheticalWWTP = fastCopy(WWTPs)
+    connectedNodes = []                 # nodes to store in connected nodes 
+    # Get ID of connected nodes
+    for f in sewers:
+        connectedNodes.append(f)
+        if sewers[f][0] != () and sewers[f][0] not in connectedNodes:
+            connectedNodes.append(sewers[f][0])
+            
+    # Read out only the network points
+    _, flowPoints = readOnlyNetwork(nodes, sewers)
+    
+    #totAnzLeute
+    
+    # Calculate final annuities of sewer system
+    completePumpCosts, completeWWTPCosts, completePublicPipeCosts = calculatetotalAnnuities(WWTPs, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, sewers, flowPoints, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement)     
+
+    fullCosts = completePumpCosts + completeWWTPCosts + completePublicPipeCosts
+    
+    return fullCosts, completePumpCosts, completeWWTPCosts, completePublicPipeCosts
                             
 def getFullHypotheticalCosts(aggregatetPoints, WWTPs, sewers, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement):
     '''
@@ -3015,18 +3160,11 @@ def getFullHypotheticalCosts(aggregatetPoints, WWTPs, sewers, EW_Q, wwtpLifespan
     # Weighted Definition of Z
     listWWTPwithAggregatedNodes = getAggregatedNodesinListWWTP(hypotheticalWWTP, sewers, aggregatetPoints) # Get aggregated nodes
     sumFlow, weightedTerm = 0, 0
-    
-    # Add all other WWTPs
-    #arcpy.AddMessage("listWWTPwithAggregatedNodes " + str(len(listWWTPwithAggregatedNodes)))
-    
-                     
+          
     for i in listWWTPwithAggregatedNodes:
         sumFlow += i[1]
         weightedTerm += float((i[1]/i[2]))
-    
-    #arcpy.AddMessage("sumFlow:          " + str(sumFlow))   
-    #arcpy.AddMessage("weightedTerm:     " + str(weightedTerm))      
-    
+
     degCenWeighted = (sumFlow - weightedTerm) / sumFlow
     
     # Read out only the network points
@@ -3034,22 +3172,16 @@ def getFullHypotheticalCosts(aggregatetPoints, WWTPs, sewers, EW_Q, wwtpLifespan
     
     # Calculate final costs of whole system
     completePumpCosts, completeWWTPCosts, completePublicPipeCosts = calculatetotalAnnuities(hypotheticalWWTP, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, sewers, flowPoints, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement)     
-    '''
-    print("Non-weighted Degree of centrality: " + str(degCen))
-    print("weighted degree of centrality:     " + str(degCenWeighted))
-    print("CompletePumpCosts:                 " + str(completePumpCosts))
-    print("CompleteWWTPCosts:                 " + str(completeWWTPCosts))
-    print("CompletePublicPipeCosts:           " + str(completePublicPipeCosts))
-    '''
+
     fullCosts = completePumpCosts + completeWWTPCosts + completePublicPipeCosts
-    #completeWWTPCosts = completePumpCosts + completeWWTPCosts # BUG FIXING?
     return degCen, degCenWeighted, fullCosts, completePumpCosts, completeWWTPCosts, completePublicPipeCosts, listWWTPwithAggregatedNodes
                   
-def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwork, startnode, edgeList, streetVertices, rasterSize, buildPoints, buildings, rasterPoints, inParameter, aggregatetPoints):
+def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwork, startnode, edgeList, streetVertices, rasterSize, buildPoints, buildings, rasterPoints, inParameter, aggregatetPoints, totalAreaCaseStudy):
     """
     SNIP Algorithm
     
     Input Arguments
+    currentSNIPrun         -    SNIP run iterator
     OnlyExecuteMerge       -    Criteria wheter only the Expansion Module is executed
     outListFolder          -    Path to store results
     runNr                  -    Shows wheter expansion module is first time exectued (1) or used in merging module (2)
@@ -3076,6 +3208,11 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
     edgeList                                                                           -    list with costs
     completePumpCosts, completeWWTPCosts, completePublicPipeCosts, totalSystemCosts    -    costs
     """                             
+    
+    # If third paper
+    # ----------------
+    # Calc only Expansion, always force connection
+    thirdPaper = True
 
     # Input parameters
     minTD = inParameter[0]                                  # [meter] Min trench depth
@@ -3093,24 +3230,26 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
     EW_Q = inParameter[12]                                  # [l] conversion factor from liter to EW 162 Liter 
     wwtpLifespan = inParameter[13]                          # [year] how long the wwtp operates
     operationCosts = inParameter[14]                        # [CHF / meter] Average operation costs per meter 
-
-    print("All Paramterers A")
-    print("minTD: " + str(minTD))
-    print("maxTD: " + str(maxTD))
-    print("f_merge: " + str(f_merge))
-    print("resonableCostsPerEW: " + str(resonableCostsPerEW))
-    print("neighborhood: " + str(neighborhood))
-    print("streetFactor: " + str(streetFactor))
-    print("pricekWh: " + str(pricekWh))
-    print("pumpYears: " + str(pumpYears))
-    print("discountYearsSewers: " + str(discountYearsSewers))
-    print("interestRate: " + str(interestRate))
-    print("stricklerC: " + str(stricklerC))
-    print("EW_Q: " + str(EW_Q))
-    print("wwtpLifespan: " + str(wwtpLifespan))
-    print("operationCosts: " + str(operationCosts))
     
-
+    arcpy.AddMessage(" ")
+    arcpy.AddMessage("All Paramterers")
+    arcpy.AddMessage("----------------")
+    arcpy.AddMessage("minTD: " + str(minTD))
+    arcpy.AddMessage("maxTD: " + str(maxTD))
+    arcpy.AddMessage("f_merge: " + str(f_merge))
+    arcpy.AddMessage("resonableCostsPerEW: " + str(resonableCostsPerEW))
+    arcpy.AddMessage("neighborhood: " + str(neighborhood))
+    arcpy.AddMessage("streetFactor: " + str(streetFactor))
+    arcpy.AddMessage("pricekWh: " + str(pricekWh))
+    arcpy.AddMessage("pumpYears: " + str(pumpYears))
+    arcpy.AddMessage("discountYearsSewers: " + str(discountYearsSewers))
+    arcpy.AddMessage("interestRate: " + str(interestRate))
+    arcpy.AddMessage("stricklerC: " + str(stricklerC))
+    arcpy.AddMessage("EW_Q: " + str(EW_Q))
+    arcpy.AddMessage("wwtpLifespan: " + str(wwtpLifespan))
+    arcpy.AddMessage("operationCosts: " + str(operationCosts))
+    arcpy.AddMessage(" ")
+    arcpy.AddMessage(" ")
 
     # Initialization of parameters
     firstIteration = 1                                      # initial parameter for first iteration
@@ -3122,7 +3261,6 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
     pumps = []                                              # List with all pumps
     expansion = 1                                           # Abort criteria   
     totalSystemCosts = []                                   # List storing total system costs and Z
-    anzBewNodes = 100                                       # Initial inhabited buildlings
     hypoWWTPcorrectFlow = []                                # Initial
     
     #pumpInvestmentCosts = inParameter[15]                  # [CHF] Investment Costs pumps
@@ -3139,9 +3277,9 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
     Zreached = 0                                            # Criteria wheter the requested Z is reached
 
     if OnlyExecuteMerge == 0:
-        anzBewNodes = calcNodesWithFlow(nodes)                # Calculate number of populated nodes
-        #print("NODE: " + str(startnode))
-        #print("WWTPs: " + str(nodes))
+        #anzBewNodes = calcNodesWithFlow(nodes)                # Calculate number of populated nodes
+        #arcpy.AddMessage("NODE: " + str(startnode))
+        #arcpy.AddMessage("WWTPs: " + str(nodes))
         WWTPs = addOriginTolistWWTPs(nodes, WWTPs, startnode) # Add wwtp to listwwtps
         
     # Additional factors for aborting the SNIP at a certain Z-Value
@@ -3149,86 +3287,116 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
     ignoreOnlyExecuteMerge = 0
     afterMM = False
     
-    forceZ = False                                             # Criteria wheter SNIP is aborted at the optimum or articially forced to connect further
-    ZtoReach = 0.99                                            # In case artifically connection is enforced SNIP terminates at this value (must be smaller than 1)
-    #arcpy.AddMessage("FORZE: " + str(forceZ))
+    #forceZ = False                                             # Criteria wheter SNIP is aborted at the optimum or articially forced to connect further
+    #ZtoReach = 0.99                                            # In case artifically connection is enforced SNIP terminates at this value (must be smaller than 1)
+
+    if thirdPaper == True:
+        forceZ = True                                             # Criteria wheter SNIP is aborted at the optimum or articially forced to connect further
+        #ZtoReach = 1                                            # In case artifically connection is enforced SNIP terminates at this value (must be smaller than 1)
+        ConnectionRateToReach = 1 #0.5 # Change this if only alf
+        #ConnectionRateToReach = 0.308148148148 # ARA REGION GROSS, SCR
+        
+        #ConnectionRateToReach = 0.5 #
+        #averageSCR: 0.308148148148            # To reach certain connection rates
+        
+        ConnectionRate = 0
+        
+        # Calculate total anzahl Leute
+        totAnzLeuteFlow = 0
+        for i in nodes:
+            totAnzLeuteFlow += i[8]
+            
+        totAnzLeute = totAnzLeuteFlow / EW_Q
+        arcpy.AddMessage("Tot Anzaol Leute: " + str(totAnzLeute))
+
     if forceZ == True:  
         iterativeCostCalc = 1   
             
-    # Create folder to store results 
-    txtResultPath = outListFolder + "ResultAsTxt" + "/"     
-    if not os.path.exists(txtResultPath):
-        os.mkdir(txtResultPath)
-  
     # Expansion Module is activated
     while expansion == 1:
-        #arcpy.AddMessage("Start expansion module...")
-        print("Start expansion module...")
-        
+        arcpy.AddMessage("Start expansion module...")
+
         if PN == []:                                          # Exit in case PN is empty 
             expansion = 0
             continue
 
         if OnlyExecuteMerge == 0 and ignoreOnlyExecuteMerge == 0: 
-            while len(PN) > 0 or firstIteration == 1:                                                       
-                if ZtoReach > hypoZWeighted:                                                                # Used to abort in case a certain z-value is reached
+            while len(PN) > 0 or firstIteration == 1:                                          
+                #arcpy.AddMessage("len(PN): " + str(len(PN)))       
+                #if ZtoReach > hypoZWeighted:                                                                # Used to abort in case a certain z-value is reached
+                if ConnectionRateToReach > ConnectionRate:
                     PN, FROMNODE, TONODE, weightFactorDijkstra, realDistance = getClosestNode(PN)           # Select next node to connect
-                    
+                    #arcpy.AddMessage("FROMNODE: " + str(FROMNODE))
+                    #arcpy.AddMessage("TONODE: " + str(TONODE))
                     if TONODE not in sewers:   
                         sewerBeforeIteration = dict(sewers)                                                 # Used in order that only not connected nodes can be wwtps
-                        #arcpy.AddMessage("TONODE: " + str(TONODE) + "   FROMNODE: " + str(FROMNODE))
-                        #arcpy.AddMessage("hypoZWeighted: " + str(hypoZWeighted))
-                        #print("TONODE: " + str(TONODE) + "   FROMNODE: " + str(FROMNODE))
-                        #print("hypoZWeighted: " + str(hypoZWeighted))
-                                              
+             
                         # Calculate hypothetical costs: Calculate costs of current network, wwtps and if hypothetically all other wwtps wouldn't be connected and have a decentral conncetion. 
                         if iterativeCostCalc == 1 and runNr == 1:
-                            hypoZ, hypoZWeighted, hypoCosts, hypoPumpCosts, hypoWWTPCosts, hypoPublicPipeCosts, hypoWWTPcorrectFlow = getFullHypotheticalCosts(aggregatetPoints, WWTPs, sewers, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement)
                             
-                            #arcpy.AddMessage("not Added hypoZ:         " + str(hypoZ))
-                            #arcpy.AddMessage("not Added hypoZWeighted: " + str(hypoZWeighted))
+                            hypoZ, hypoZWeighted, _, _, _, _, _ = getFullHypotheticalCosts(aggregatetPoints, WWTPs, sewers, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement)
+                            hypoCosts, PumpCostsThird, WWTPCostsThird, PublicPipeCostsThird = getFullCostsThirdPaper(totAnzLeute, aggregatetPoints, WWTPs, sewers, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement)
+                            #arcpy.AddMessage("--------------")
+                            #arcpy.AddMessage("PublicPipeCostsThird: " + str(PublicPipeCostsThird))
+
+                            # Calculate connection rate
+                            #---------------------------
+                            totalFlowInNOlyWWTP = WWTPs[0][1] # Zufluss
+                            #arcpy.AddMessage("WWTPs: " + str(WWTPs))
                             
-                            # SCRAP
-                            #arcpy.AddMessage("LEN ORIG WWT: " + str(len(WWTPs)))
-                            #arcpy.AddMessage("LEN HYPW WWT: " + str(len(hypoWWTPcorrectFlow)))
+                            nrOfConnectedPeople = totalFlowInNOlyWWTP/float(EW_Q)
+                            #arcpy.AddMessage("nrOfConnectedPeople: " + str(nrOfConnectedPeople))
                             
-                            #hypoZWeighted = calcZweighted(forceZ, iterativeCostCalc, hypoWWTPcorrectFlow, sewers, aggregatetPoints, WWTPs)  # Weighted Definition of Z
-                            
+                            ConnectionRate= nrOfConnectedPeople/float(totAnzLeute)
+                            #arcpy.AddMessage("ConnectionRate: " + str(ConnectionRate))
+
+                            # hypoWWTPCosts --> Costs per person for a WWTP Costs 
                             if reActivationEM == 0:
-                                if hypoCosts < hypoCostsOld:
-                                    totalSystemCosts.append([hypoZ, hypoZWeighted, hypoCosts, hypoPumpCosts, hypoWWTPCosts, hypoPublicPipeCosts])   # Store costs in list
+                                if hypoCosts < hypoCostsOld or thirdPaper == True:
+                                    #arcpy.AddMessage("hypoZWeighted: " + str(hypoZWeighted))
+                                    # Calculate total Nr of people connected
+                                    if thirdPaper == True:
+                                        #arcpy.AddMessage("WWTPs: " + str(WWTPs))
+                                        totalFlowInNOlyWWTP = WWTPs[0][1]
+                                        nrOfConnectedPeople = totalFlowInNOlyWWTP/float(EW_Q)
+                                        #arcpy.AddMessage("nrOfConnectedPeople: " + str(nrOfConnectedPeople))
                                     
+                                    ConnectionRate= nrOfConnectedPeople/float(totAnzLeute)
+                                    
+                                    # Calculate Density in order to read cost
+                                    AnzahlOST = len(PN) + 1
+                                    DensityOST = AnzahlOST / totalAreaCaseStudy      # OSt Density
+                                    
+                                    #arcpy.AddMessage("AnzahlOST: " + str(AnzahlOST))
+                                    #arcpy.AddMessage("len(PN):   " + str(len(PN)))
+                                    #arcpy.AddMessage(len(aggregatetPoints))
+                                    #arcpy.AddMessage(len(WWTPs))
+                                    #arcpy.AddMessage("---")
+                                    #arcpy.AddMessage("totalAreaCaseStudy: " + str(totalAreaCaseStudy))
+                                    
+                                    #arcpy.AddMessage(" ")
+                                    #arcpy.AddMessage("-- hypoCosts " + str(hypoCosts))
+                                    #arcpy.AddMessage("PublicPipeCostsThird: " + str(PublicPipeCostsThird))
+                                    #arcpy.AddMessage("APPEND COSTS: " + str([hypoZ, hypoZWeighted, hypoCosts, PumpCostsThird, WWTPCostsThird, PublicPipeCostsThird, nrOfConnectedPeople]))
+                                    #arcpy.AddMessage("totAnzLeute:         " + str(totAnzLeute))
+                                    #arcpy.AddMessage("nrOfConnectedPeople: " + str(nrOfConnectedPeople))
+                                    #arcpy.AddMessage("--")
+                                    #arcpy.AddMessage("CR:                  " + str(ConnectionRate))
+                                    #arcpy.AddMessage("PER CATIA COSTS:     " + str(PublicPipeCostsThird/nrOfConnectedPeople))
+                                    #arcpy.AddMessage("OST DENSITY:         " + str(DensityOST))
+                                    
+                                    totalSystemCosts.append([hypoZ, hypoZWeighted, hypoCosts, PumpCostsThird, WWTPCostsThird, PublicPipeCostsThird, nrOfConnectedPeople, DensityOST, AnzahlOST, ConnectionRate, totAnzLeute])   # Store costs in list
                             hypoCostsOld = hypoCosts
                             
-                            #arcpy.AddMessage("COSTS")
-                            #arcpy.AddMessage("----------------")
-                            ##arcpy.AddMessage(hypoZ)
-                            #arcpy.AddMessage(hypoZWeighted)
-                            #arcpy.AddMessage("--")
-                            #arcpy.AddMessage("hypoCosts:             " + str(hypoCosts))
-                            #arcpy.AddMessage("hypoPumpCosts:         " + str(hypoPumpCosts))
-                            #arcpy.AddMessage("hypoWWTPCosts:         " + str(hypoWWTPCosts))
-                            #arcpy.AddMessage("hypoPublicPipeCosts:   " + str(hypoPublicPipeCosts))
-                            #arcpy.AddMessage("--")
-                            #arcpy.AddMessage("totalSystemCosts: " + str(totalSystemCosts))
-                            
-                            # Scrap
-                            
-                            
-                                
                         if len(sewers) > 0:
                             firstIteration = 0
                         else:
                             sewers = initialSetNetwork(sewers, TONODE, FROMNODE, realDistance)                              # Initial Sewer Network
   
-                        percentConnected = round((float(anzBewNodes) - float(len(PN))) / float(anzBewNodes) * 100, 2)       # percentage of connected nodes
-                        #arcpy.AddMessage("Nodes checked in EM... " + str(percentConnected) + " % [" + str(anzBewNodes) + "]")
-                        #print("Nodes checked in EM... " + str(percentConnected) + " % [" + str(anzBewNodes) + "]")
-                        
                         # Path finding module (PFM)
                         if firstIteration == 0:
-                            idp0, p0, fromFlowA, fromFlowB, _, _ = getPns(FROMNODE, nodes)                                                     # get node information
-                            idp1, p1, flowToA, flowToB, forceConnection, _ = getPns(TONODE, nodes)                                         # get node information
+                            idp0, p0, _, _, _, _ = getPns(FROMNODE, nodes)                                                     # get node information
+                            idp1, p1, _, _, forceConnection, _ = getPns(TONODE, nodes)                                         # get node information
                             _, slopeMST, heightDiff = distanceCalc3d(p0, p1)                                                # calc slope of straight distance
                             try:                                                                                            # Try to find path on street with Dijkstra Algorithm
                                 archPath, distStartEnd, _ = dijkstra(streetNetwork, idp0, idp1, heightDiff)                 # Djikstra   
@@ -3248,22 +3416,17 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
                                 # In case the MM has been executet one a* is not considered anymore (because there is always a connection along the street network)
                                 if distStartEnd >= streetFactor * realDistance and afterMM != True:           # Fstreet Factor
                                     changeStreetGraph, streetConnection = 1, 0                                # Path along the terrain
-                                    #print("OKO: " + str(changeStreetGraph))
                                 else: 
                                     changeStreetGraph = 0                                                     # Path along the street
 
                             # If there is no street, the a* algorithm is used to find shortest path on DEM. If there is no such path, a MST is returned.
                             if streetConnection == 0: 
                                 #arcpy.AddMessage("Try finding a path along the terrain (a*)...")
-                                changeStreetGraph = 1  
-                                
-                                # **********************************
-                                # REMOVE ASTAR (10.11.2016)
-                                # **********************************
+                                changeStreetGraph = 1                      
+                                                     
                                 archPathMST = [[idp0, [idp1, realDistance, slopeMST]]]
                                 boundingCandidates = []
-                                '''                                         
-                                archPathMST, boundingCandidates = aStar(rasterSize, rasterPoints, buildPoints, p0, p1, idp0, idp1, neighborhood, f_topo)
+                                '''archPathMST, boundingCandidates = aStar(rasterSize, rasterPoints, buildPoints, p0, p1, idp0, idp1, neighborhood, f_topo)
                                 nodes = addDEMPntstoNodes(nodes, archPathMST, boundingCandidates, FROMNODE, TONODE, minTD)  # Add new DEM-Points to nodes
                                 
                                 if len(archPathMST) == 0:
@@ -3272,22 +3435,19 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
                                         archPathMST = archPath                                                              # But if there is a street connection, take the street distance
                                     else:
                                         archPathMST = [[idp0, [idp1, realDistance, slopeMST]]]    
-                                ''' 
+                                '''
     
                             # Change Street Graph and append edges of a* algorithm
                             if changeStreetGraph == 1:
-                                #arcpy.AddMessage("CHANGE STREEET GRAPH")
                                 wayProperty = 0 
                                 edgeList, streetNetwork = addEdgesUpdateStreetNetwork(wayProperty, archPathMST, nodes, boundingCandidates, edgeList, streetNetwork)
                        
                         # Path calculations
                         if firstIteration == 0:
                             if changeStreetGraph == 0 :                                                                     # Insert archPath in network
-                                #arcpy.AddMessage("archPath A : " + str(archPath))
                                 sewers = appendToNetwork(sewers, archPath)                                                  # Append path from this node to closest WWTP from this point in P
                                 tooLongPath = readPath(archPath, TONODE)                                                    # path from FROMNODE to TONODE  
                             else:
-                                #arcpy.AddMessage("archPathMST B: " + str(archPathMST))
                                 sewers = appendToNetwork(sewers, archPathMST)                                               # Append path from this node to closest WWTP from this point in P
                                 tooLongPath = readPath(archPathMST, TONODE)                                                 # path from FROMNODE to TONODE
                                 
@@ -3329,7 +3489,7 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
 
                             # --------
                             # Option 1
-                            # --------
+                            # --------        
                             
                             # Option 1 - Sewer costs
                             nodesA1 = updateFlowA1(nodesA1, pathNearWTPInvert, allPopNodesOntheWay)                                                             # Correct flow along the path.
@@ -3348,8 +3508,7 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
                             # Option 2
                             # --------
                             
-                            # Always the smaller network is considered to be the "decental" network used for calculating the reasonable costs
-                            # New 25.02.2015   
+                            # Always the smaller network is considered to be the "decental" network used for calculating the reasonable costs 
                             for fl in nodes:
                                 if fl[0] == pathNearWTPInvert[-1][0]:
                                     flowTo = fl[8] + fl[4]
@@ -3360,30 +3519,11 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
                                     break
                                 
                             summedFlowDecentralWWTP = getFlowtoCalculateRC(allPopNodesOntheWay, flowFrom, flowTo, nodes)              
-                            #summedFlowDecentralWWTP = getFlowtoCalculateRC(allPopNodesOntheWay, fromFlowA, fromFlowB,flowToA, flowToB, nodes) 
-                            
-                            #arcpy.AddMessage("-----QUERY-------")
-                            #arcpy.AddMessage(fromFlowA)
-                            #arcpy.AddMessage(fromFlowB)
-                            #arcpy.AddMessage(flowToA)
-                            #arcpy.AddMessage(flowToB)
-                            #arcpy.AddMessage("------------")
-                            
-                            
-                            
+
                             # Option 2 - WWTPs costs # TODO CHANGE FLOWTOADD (REMOVE)
                             costDecentralWWTPs = sumCostOfArchWWTPs(allPopNodesOntheWay[:-1], nodes, EW_Q, wwtpLifespan, interestRate, fc_wwtpOperation, fc_wwtpReplacement)  # Calculate costs of new wwtps on added path
                             wtpCostClosestARA = costWWTP(flowWWFrom, EW_Q, wwtpLifespan, interestRate, fc_wwtpOperation, fc_wwtpReplacement)                                             # cost of already build wwwt
                             WWTPcostsA2 = costDecentralWWTPs + wtpCostClosestARA        
-                            
-                            #arcpy.AddMessage("PFAD: " + str(pathNearWTPInvert))
-                            #arcpy.AddMessage("GLOBI A: " + str(allPopNodesOntheWay))
-                            #arcpy.AddMessage("GflowAllArchPathWWTPs: " + str(flowAllArchPathWWTPs))
-                            #arcpy.AddMessage("costDecentralWWTPs:  " + str(costDecentralWWTPs))
-                            
-                            #arcpy.AddMessage("GflowAllArchPathWWTPs: " + str(flowAllArchPathWWTPs))
-                            #arcpy.AddMessage("costDecentralWWTPs:  " + str(costDecentralWWTPs))
-                            #arcpy.AddMessage("flowWWFrom: " + str(flowWWFrom))
                             
                             # Option 2 - Sewer costs
                             pipeCostA2, _ = costToWTP(pathSubNetworkToClosestWWTP, edgeList, nodes, pumps, minTD, TONODE, sewerBeforeIteration, discountYearsSewers, interestRate, stricklerC, operationCosts, f_SewerCost)  # Pipe costs
@@ -3394,6 +3534,7 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
                             # --------
                             # Option 3
                             # --------
+
                             # Option 3 - WWTPs costs
                             WWTPcostsA3 = WWTPcostsA1                                      
                                 
@@ -3416,27 +3557,20 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
                             totCostsA2 = pipeCostA2 + WWTPcostsA2 + pumpCostA2  # Option II
                             totCostsA3 = pipeCostA3 + WWTPcostsA3 + pumpCostA3  # Option III
 
+                            #arcpy.AddMessage("--------")
+                            #arcpy.AddMessage("A: " + str(totCostsA1))
+                            #arcpy.AddMessage("B: " + str(totCostsA2))
+                            #arcpy.AddMessage("C: " + str(totCostsA3))
+                            
                             # Calculate cost of cheapest central connection costs.
                             costConnectionA = calculateConnectionCosts(pipeCostA1, pumpCostWholePeriodI, pipeCostA2, pumpCostWholePeriodA2, pipeCostA3, pumpCostWholePeriodA3, WWTPcostsA1, interestRate, wwtpLifespan, discountYearsSewers)
                            
-                            #resonableCosts = flowToAdd/EW_Q * resonableCostsPerEW  # Total reasonable costs # Calculate reasonable costs (If positive: central costs are more expensive, if negative: decentral is more expensive)                                                                                                       # 1: Ignore, 0: Don't Ignore 
-                            
                             resonableCosts = summedFlowDecentralWWTP/EW_Q * resonableCostsPerEW  # Total reasonable costs # Calculate reasonable costs (If positive: central costs are more expensive, if negative: decentral is more expensive)                                                                                                       # 1: Ignore, 0: Don't Ignore 
 
-                            
+                            if thirdPaper == True:
+                                forceConnection = True
+                                
                             swapCriteria, dezentralCriteria = costComparison(totCostsA1, totCostsA2, totCostsA3, resonableCosts, costConnectionA, 0, forceConnection, 1)  # Compare costs and select option, consider reasonable costs
-                            
-                            #arcpy.AddMessage("COST COMAPRIOSN_______________")
-                            #arcpy.AddMessage("totCostsA1: " + str(totCostsA1))
-                            #arcpy.AddMessage("totCostsA2: " + str(totCostsA2))
-                            #arcpy.AddMessage("totCostsA3: " + str(totCostsA3))
-                            #arcpy.AddMessage("resonableCosts: " + str(resonableCosts))
-                            #arcpy.AddMessage("")
-                            
-                            #arcpy.AddMessage("forceConnection: " + str(forceConnection))
-                            #arcpy.AddMessage("swapCriteria: " + str(swapCriteria))
-                            #arcpy.AddMessage("dezentralCriteria: " + str(dezentralCriteria))
-                            #arcpy.AddMessage("---------------------------------------------")
                             
                             if dezentralCriteria == 0 and forceConnection != 1:
                                 #arcpy.AddMessage("OPTION NO Connection")
@@ -3444,8 +3578,7 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
                                     WWTPs, intermediateWWTPs = addToListWTPs(archPath, nodes, sewerBeforeIteration, WWTPs)
                                 else:  
                                     WWTPs, intermediateWWTPs = addToListWTPs(archPathMST, nodes, sewerBeforeIteration, WWTPs)
-                                
-                                #arcpy.AddMessage("intermediateWWTPs: " + str(intermediateWWTPs)) 
+
                                 sewers_Current = appendToSewers(sewers_Current, intermediateWWTPs)                          # Append to sewers_Current 
                                 sewers = dict(sewerBeforeIteration)
                                 sewers = appendListWTPsToNetwork(sewers, intermediateWWTPs)                                 # Append to network
@@ -3479,78 +3612,62 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
                                     WWTPs = updateFlowInWWTP(WWTPs, nodes, closestARAtraditionell)                          # Update list with wwtps                                
                                     nodes = removeForceCriteria(nodes, closestARAtraditionell)
 
-                        PN, initialPN, firstIteration = initialPrimCalc(firstIteration, startnode, nodes, PN, initialPN)    # Initia prim based calculation
+                        PN, initialPN, firstIteration = initialPrimCalc(firstIteration, startnode, nodes, PN, initialPN, rasterSize, rasterPoints)    # Initia prim based calculation
                         
                         if len(sewers) > 1:
                             if dezentralCriteria == 0:
                                 allPopNodesOntheWay = [TONODE]
-                            PN = primCalculations(nodes, PN, allPopNodesOntheWay)                                           # Update prim distances
+                            PN = primCalculations(nodes, PN, allPopNodesOntheWay, rasterSize, rasterPoints, WWTPs)                                           # Update prim distances
                 else:                                                                                                       # Z-Value reached to abort
                     Zreached, expansion, firstIteration, PN = 1, 0, 0, []
+                    #arcpy.AddMessage("EGON: " + str(Zreached))
             firstIteration = 0 
-
-        else: # Go directly to Merging Module
-            #arcpy.AddMessage("Merge is directly executed. You must specify the path of the already calculated projects.")
-            ExpansionTime, PN, totalSystemCosts = 0, ['E'], [[0, 0, 0, 0, 0, 0]]
-
-            # Main Folder of already calculated projects
-            #mainFolder = "Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\02_GIS_BERN\\00_TESTMERGE\\"
-            mainFolder = "Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\02_GIS_BERN\\000_TESTMERGE2\\"
-
-            edgeList, streetNetwork, WWTPs, nodes, aggregatetPoints, pumps, sewers_Current, sewers, buildings, inParameter, buildPoints = collectData(mainFolder)
-              
-            # Input parameters
-            minTD = inParameter[0]                                  # [meter] Min trench depth
-            maxTD = inParameter[1]                                  # [meter] Maximum trench depth
-            minSlope = inParameter[2]                               # [%] Criteria of minimum slope without pumps needed
-            f_merge = inParameter[3]                                # Factor do determine how the OST are reconnected. Puts the size in relation ot the distance. If large, the size gets more important
-            resonableCostsPerEW = inParameter[4]                    # [CHF] Reasonable Costs per EW
-            neighborhood = inParameter[5]                           # How large the neibhourhood is for searching paths
-            streetFactor = inParameter[6]                           # How much the path follows the roads
-            pricekWh = inParameter[7]                               # Electricity prices
-            pumpYears = inParameter[8]                              # Number of years the pummp needs to pump [years]. Needed in order to compare lifespan of pipes to pumping costs
-            discountYearsSewers = inParameter[9]                    # [year] Years the pips will survive
-            interestRate = inParameter[10]                          # [%] Interest rate
-            stricklerC = inParameter[11]                            # [m3/s] Strickler coefficient
-            EW_Q = inParameter[12]                                  # [l] conversion factor from liter to EW 162 Liter 
-            wwtpLifespan = inParameter[13]                          # [year] how long the wwtp operates
-            operationCosts = inParameter[14]                        # [CHF / meter] Average operation costs per meter 
-            f_topo = inParameter[16]                                # [-] Weighting factor for the DEM graph creation of the topography
-            f_SewerCost = inParameter[17]                           # [-] cost factor
-            fc_wwtpOperation  = inParameter[18]                     # [-] cost factor
-            fc_wwtpReplacement = inParameter[19]                    # [-] cost factor
-            
-            nodes, sewers, pumps, WWTPs, PN, edgeList, totalSystemCosts = mergingModule(OnlyExecuteMerge, forceZ, ZtoReach, hypoZWeighted, firstMergeCrit, aggregatetPoints, nodes, WWTPs, sewers_Current, edgeList, pumps, PN, sewers, streetNetwork, f_merge, minTD, maxTD, minSlope, discountYearsSewers, interestRate, stricklerC, operationCosts, pricekWh, pumpYears, wwtpLifespan, EW_Q, resonableCostsPerEW, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement, totalSystemCosts, iterativeCostCalc) 
-
-            # Test if there is still expansion needed         
-            if PN == [] or len(PN) == 1 and PN[0][0] == 'E':
-                PN = []
-                expansion = 1           # Continue
-            else:
-                expansion = testExpansion(PN)
- 
-            OnlyExecuteMerge = 0        # Reset in order than Expansion can be executed again
-            ignoreOnlyExecuteMerge = 0  # From don't exececute only merging module
-            afterMM = True              # Now the MM has been executed
-            continue                    # Get to top again
-
-        # Merging modul after Expansion Module
-        if Zreached == 0:                                                       # Go to Merging Module
-            nodes, sewers, pumps, WWTPs, PN, edgeList, totalSystemCosts = mergingModule(OnlyExecuteMerge, forceZ, ZtoReach, hypoZWeighted, firstMergeCrit, aggregatetPoints, nodes, WWTPs, sewers_Current, edgeList, pumps, PN, sewers, streetNetwork, f_merge, minTD, maxTD, minSlope, discountYearsSewers, interestRate, stricklerC, operationCosts, pricekWh, pumpYears, wwtpLifespan, EW_Q, resonableCostsPerEW, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement, totalSystemCosts, iterativeCostCalc) 
-            runNr, firstMergeCrit, reActivationEM = 0, 0, 1                     # Expansion module is finished, As from now on the EM is only reactivated    
-            expansion = testExpansion(PN)                                       # Test if there is still expansion needed
-
-    if reActivationEM == 0:                                                     # In case Expansion module is aborted because the wished Z-Values is reached, consider all not yet connected nodes as WWTPs
-        final_wwtps = turnNodesIntoWWTP(WWTPs, nodes, aggregatetPoints, sewers) # Add all not yet connected nodes to WWTPs
-    else:
-        final_wwtps = WWTPsToDraw(WWTPs, nodes)                                 # Write all WWTPs
-    final_Network, flowPoints = readOnlyNetwork(nodes, sewers)                  # Read out only the network points
-    final_Pumps = readPumpList(pumps, nodes)                                    # Read out all pumps
+        
+        if thirdPaper == True and len(PN) == 0:
+            #arcpy.AddMessage("Zreached fertig: " + str(Zreached))
+            #arcpy.AddMessage("ZtoReach fertig: " + str(ZtoReach))
+            #arcpy.AddMessage("LENPNL fertig:   " + str(len(PN)))
+            Zreached = 1
+    
+    final_wwtps = WWTPsToDraw(WWTPs, nodes)                                      # Write all WWTPs
+    final_Network, flowPoints = readOnlyNetwork(nodes, sewers)                   # Read out only the network points
+    final_Pumps = readPumpList(pumps, nodes)                                     # Read out all pumps
 
     # Calculate costs of whole system
     completePumpCosts, completeWWTPCosts, completePublicPipeCosts = calculatetotalAnnuities(WWTPs, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, final_Network, flowPoints, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement)
     
+    # Apend cost of last configuration
+    if thirdPaper == True:
+
+        hypoZ, hypoZWeighted, _, _, _, _, _ = getFullHypotheticalCosts(aggregatetPoints, WWTPs, sewers, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement)
+        hypoCosts, PumpCostsThird, WWTPCostsThird, PublicPipeCostsThird = getFullCostsThirdPaper(totAnzLeute, aggregatetPoints, WWTPs, sewers, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement)
+
+        totalFlowInNOlyWWTP = WWTPs[0][1]
+        nrOfConnectedPeople = totalFlowInNOlyWWTP/float(EW_Q)
+        
+        ConnectionRate= nrOfConnectedPeople/float(totAnzLeute)
+        arcpy.AddMessage("nrOfConnectedPeople Final: " + str(nrOfConnectedPeople))
+        arcpy.AddMessage("ConnectionRate final:      " + str(ConnectionRate))
+        
+                                    
+        # Calculate Density in order to read cost
+        AnzahlOST = 0
+        DensityOST = (AnzahlOST + 1) / float(totalAreaCaseStudy)      # Ost Density
+
+        arcpy.AddMessage("" )
+        arcpy.AddMessage("DensityOST: " + str(DensityOST))
+        arcpy.AddMessage("hypoZ  " + str(hypoZ))
+        arcpy.AddMessage("hypoZWeighted  " + str(hypoZWeighted))
+        arcpy.AddMessage("TEST FIAL: " + str(hypoCosts))
+        arcpy.AddMessage("TEST FIAL: " + str(PumpCostsThird))
+        arcpy.AddMessage("TEST FIAL: " + str(WWTPCostsThird))
+        arcpy.AddMessage("TEST FIAL: " + str(PublicPipeCostsThird))
+        
+        totalSystemCosts.append([hypoZ, hypoZWeighted, hypoCosts, PumpCostsThird, WWTPCostsThird, PublicPipeCostsThird, nrOfConnectedPeople, DensityOST, AnzahlOST, ConnectionRate, totAnzLeute])   # Store costs in list
+
+        
     # Store the result as .txt files
+    txtResultPath = outListFolder
     writeTotxt(txtResultPath, "inParameter", inParameter)
     writeToDoc(txtResultPath, "streetNetwork", streetNetwork)
     writeTotxt(txtResultPath, "aggregatetPoints", aggregatetPoints)
@@ -3565,509 +3682,17 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
     
     # Calculate Z values
     calcZValue(aggregatetPoints, forceZ, iterativeCostCalc, hypoWWTPcorrectFlow, WWTPs)             # Z normal
-    _ = calcZweighted(forceZ, iterativeCostCalc, hypoWWTPcorrectFlow, sewers, aggregatetPoints, WWTPs)  # Weighted Definition of Z
-    ##arcpy.AddMessage("---------------------------")
-    ##_ = calcZweighted(forceZ, iterativeCostCalc, WWTPs, final_Network, aggregatetPoints, WWTPs)  # Weighted Definition of Z
     
-    flowIfSameCheck(final_wwtps, aggregatetPoints)                                                  # Check if flow is lost
-    
-    arcpy.AddMessage("ZtoReach: " + str(ZtoReach))
+    flowIfSameCheck(final_wwtps, aggregatetPoints, ConnectionRateToReach)                                                  # Check if flow is lost
     arcpy.AddMessage("SNIP is successfully calculated.")
-    arcpy.AddMessage("Costs per iteration:" + str(totalSystemCosts))
+    #arcpy.AddMessage(completePumpCosts)
+    #arcpy.AddMessage(completeWWTPCosts)
+    #arcpy.AddMessage(completePublicPipeCosts)
+    #arcpy.AddMessage(completePumpCosts + completeWWTPCosts + completePublicPipeCosts)
+    #arcpy.AddMessage("Costs per iteration:" + str(totalSystemCosts))
     MergeTime, ExpansionTime = 0, 0
                         
     return ExpansionTime, MergeTime, final_Network, flowPoints, WWTPs, final_wwtps, final_Pumps, edgeList, completePumpCosts, completeWWTPCosts, completePublicPipeCosts, totalSystemCosts, buildings, buildPoints, aggregatetPoints
-
-def mergingModule(OnlyExecuteMerge, forceZ, ZtoReach, hypoZWeighted, firstMergeCrit, aggregatetPoints, nodes, WWTPs, sewers_Current, edgeList, pumps, PN, sewers, streetNetwork, f_merge, minTD, maxTD, minSlope, discountYearsSewers, interestRate, stricklerC, operationCosts, pricekWh, pumpYears, wwtpLifespan, EW_Q, resonableCostsPerEW, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement, totalSystemCosts, iterativeCostCalc):
-    '''
-    Merging Module
-    
-    Input Arguments:
-    OnlyExecuteMerge     -    Shows wheter summary calculation with different folders: 1 --> yes
-    forceZ               -    Criteria to reach full centralization
-    ZtoReach             -    Abort Z criteria
-    firstMergeCrit       -    Criteria wheter executed the first time or not
-    nodes                -    Nodes
-    WWTPs                -    WWTPs
-    sewers_Current       -    sewer network from expansion module
-    edgeList             -    List with edges
-    pumps                -    Pumps
-    PN                   -    Prim list with distances
-    sewers               -    Sewer Network
-    streetNetwork        -    Street Network
-    f_merge              -    Merging Factor
-    minTD                -    Minimum Trench depth
-    maxTD                -    Maximum Trench Depth
-    minSlope             -    Minimum slope
-    discountYearsSewers  -    Discounting years
-    interestRate         -    Inerest rate
-    stricklerC           -    Strickler coefficient
-    operationCosts       -    Operation costs
-    pricekWh             -    energy costs
-    pumpYears            -    Lifepspan pumps
-    pumpInvestmentCosts  -    pump investment costs
-    wwtpLifespan         -    wwtp lifespan
-    EW_Q                 -    sewage per person per day
-    resonableCostsPerEW  -    reasonable costs  
-    totalSystemCosts     -    List conting Z and hypothethical costs
-    iterativeCostCalc    -    
-    
-    Output Arguments:
-    nodes:                -    Networ nodes
-    sewers:               -    Sewers
-    pumps:                -    Pumps
-    WWTPs:                -    WWTPs
-    PN:                   -    Prim distances
-    edgeList              -    List with edges
-    totalSystemCosts      -    Total System Costs
-    '''
-    sortedListWWTPs = fastCopy(WWTPs)
-    sortedListWWTPs.sort(key=operator.itemgetter(1))    # Sort list along the size (second position in list)
-    sortedListWWTPs = sortedListWWTPs[::-1]             # Invert sorting in oder that max values are first
-    mergeCostStorage = []                               # Used to store cheapest connetio nin case Z == 1 wants to be achieved
-    finishedExpansion = 0
-    
-    if iterativeCostCalc == 1:
-        hypoZOld = totalSystemCosts[len(totalSystemCosts)-1][0] # Current Z value
-    else:
-        hypoZOld = 0
-    
-    # As long not merging is exited and there are wwtps to reconnect
-    while len(sortedListWWTPs) > 1 and ZtoReach > hypoZWeighted and len(WWTPs) > 2: #last is new
-        wwtpsIterate, expansionM = fastCopy(WWTPs), True
-
-        # In case a connection is forced
-        if forceZ == True and len(sortedListWWTPs) == 2 or finishedExpansion == 1: # Second Condition is new
-
-            # NEW 19.05.2015
-            if len(sortedListWWTPs) == 2:
-                sortedListWWTPs = fastCopy(WWTPs)
-                finishedExpansion = 1
-
-            if ZtoReach > hypoZWeighted:    
-                
-                if len(sortedListWWTPs) == 2 or finishedExpansion == 1:
-                    #arcpy.AddMessage("Forced furger merging..." + str(hypoZWeighted))
-                    mergeCostStorage, cheapestM = getCheapestMerge(mergeCostStorage, WWTPs)                     # get cheapest connection
-                    CurrentCheckedWWTP, checkBackConnectionID = cheapestM[1], cheapestM[2]
-
-                else:
-                    CurrentCheckedWWTP, checkBackConnectionID = sortedListWWTPs[0], sortedListWWTPs[0][0]       # Current WWTP to check for merge, Get largest wwtp to check
-                    del sortedListWWTPs[0] 
-            else:                                                                                               # Quit SNIP 
-                sortedListWWTPs = []
-                continue
-        else:
-            CurrentCheckedWWTP, checkBackConnectionID = sortedListWWTPs[0], sortedListWWTPs[0][0]               # Current WWTP to check for merge, Get largest wwtp to check
-        
-        #arcpy.AddMessage(" ")  
-        #arcpy.AddMessage(" ")  
-        #arcpy.AddMessage("Mergingggg... (Number of WWTPs: " + str(len(WWTPs)) + str(")"))
-        #arcpy.AddMessage("------------------------------------------------------------------")   
-        #arcpy.AddMessage("Nr of Merging Test to go: " + str(len(sortedListWWTPs)))
-        #arcpy.AddMessage(" ")
-        #arcpy.AddMessage(" CurrentCheckedWWTP: " + str(CurrentCheckedWWTP))  
-        #arcpy.AddMessage("checkBackConnectionID: " + str(checkBackConnectionID))
-        #arcpy.AddMessage("hypoZWeighted: " + str(hypoZWeighted))
-        #arcpy.AddMessage("finishedExpansion:" + str(finishedExpansion))
- 
-        #print(" ")  
-        #print(" ")  
-        #print("Mergingggg... (Number of WWTPs: " + str(len(WWTPs)) + str(")"))
-        #print("------------------------------------------------------------------")   
-        
-        #print("Nr of Merging Test to go: " + str(len(sortedListWWTPs)))
-        #print(" ")
-        #print(" CurrentCheckedWWTP: " + str(CurrentCheckedWWTP))  
-        #print("checkBackConnectionID: " + str(checkBackConnectionID))
-        #print("hypoZWeighted: " + str(hypoZWeighted))
-        
-        if len(WWTPs) == 1:                                     # If only one WWTP left quit SNIP
-            expansionM = False
-            break
-        
-        while len(wwtpsIterate) > 1 and expansionM == True:    # Iterate until all WWTPs are checked   
-            sewers_NoCon = dict(sewers)                        # Make copy 
-            pumps_noCon = fastCopy(pumps)                      # Make copy   
-            nodes_noCon = fastCopyNodes(nodes)                 # Make copy 
-            WWTPS_noCon = fastCopy(WWTPs)                      # Make copy 
-            PN_noCon = fastCopy(PN)                            # Make copy 
-            sortedListWWTPs_noCon = fastCopy(sortedListWWTPs)  # Make copy 
-            wwtpToWwtopConncetion = 0                          # Criteria to define wheter wwtps are connected or not                              
-                
-            while expansionM == True: 
-                _, pZero, _, _, forceCentralConnection, _ = getPns(checkBackConnectionID, nodes)  # Select wwtp where node was connected and test if connection is allowed
-                if forceCentralConnection == 1:  
-                    wwtpsIterate = delEntry(wwtpsIterate, checkBackConnectionID) 
-                    expansionM = True
-
-                # Option Selection Module (OSM)   
-                nodeIdOpt1, nodeOpt1Cor, nodeIdOpt3, nodeOpt3Cor = connectivityPotential(nodes, WWTPs, checkBackConnectionID, pZero, f_merge)    # Option 1 & Option 3
-                nodeIdOpt2, nodeOpt2Cor, pathInClosestNetwork = getClosestNetworkWWTP(nodes, WWTPs, sewers_NoCon, pZero, checkBackConnectionID)  # Option 2
-                mergeOptions = storeMergingOptions(nodeIdOpt1, nodeOpt1Cor, nodeIdOpt2, nodeOpt2Cor, nodeIdOpt3, nodeOpt3Cor)         # Store Merging Options in a list
-                
-                if mergeOptions == []:  # No more possibilities for merging
-                    expansionM = False
-                    break  
-
-                # In case we want to reach Z == 1
-                if ZtoReach > hypoZWeighted and finishedExpansion == 1: #
-                    mergeOptions = [cheapestM[3]] 
-                
-                #arcpy.AddMessage("WWTPS: " + str(WWTPs))
-                if expansionM == True: 
-                    iterateMergeOptions = True  
-                    while iterateMergeOptions == True:
-                        #arcpy.AddMessage("Option to test merge: " + str(mergeOptions))
-                        if len(mergeOptions) == 0:
-                            iterateMergeOptions = False
-                            expansionM = False
-                            break
-                        
-                        for mOpt in mergeOptions:
-                            try:                                                                                                      # Search path between WWTps with Djikstra
-                                #arcpy.AddMessage("FROM: " + str(mOpt[0]))
-                                #arcpy.AddMessage("TO: " + str(checkBackConnectionID))
-                                heightDiff = abs(pZero[2] - mOpt[1][2])                                                                          # heightdifference
-                                archPathWWTP, distStartEnd, slopeDijkstra = dijkstra(streetNetwork, mOpt[0], checkBackConnectionID, heightDiff)  # Djkstra
-                                edgeList = addToEdgeList(edgeList, distStartEnd, slopeDijkstra, mOpt[0], checkBackConnectionID, mOpt[1], pZero)  # If the new streetDistance is not already added in edgeList, add to edgeList
-
-                            except KeyError:
-                                #arcpy.AddMessage("NO STREET WAS FOUND: This might be because the merged areas are not interconnected by streets.")
-                                
-                                # It might be possible that no street was found because merged areas
-                                #arcpy.AddMessage("...........")
-                                #arcpy.AddMessage(mOpt)
-                                #arcpy.AddMessage(pZero)
-                                #arcpy.AddMessage(checkBackConnectionID)
-                                
-                                #realDistance = distanceCalc3d(mOpt, pZero)
-                                #archPathMST = [[mOpt[0], [checkBackConnectionID, realDistance, slopeMST]]]
-                                raise Exception("There can be no sewer path be determined between the two wwtps.")
-
-                            if nodeIdOpt2 == mOpt[0]:
-                                archPathWWTP = mergePathClosestNetwork(pathInClosestNetwork, archPathWWTP, edgeList)     # If closest network, check path again.
-                            
-                            archPathWWTP = getNoLoopPath(sewers, archPathWWTP)                              # Path is changed in order that there are no loops.      
-                            sewers = appendToNetwork(sewers, archPathWWTP)                                  # Append no loop path to sewers
-                            inversearchPathWWTP = invertArchPath(archPathWWTP)      
-                                
-                            # Get parts of path which are already part of a the starting and ending network
-                            nodesToNetwork = findInNetworkPath(archPathWWTP, sewers_NoCon, sewers)          # finds part of the From Network which need to be considered in costs calculations
-                            nodesFromNetwork = findInNetworkPath(inversearchPathWWTP, sewers_NoCon, sewers) # finds part of the To Network which need to be considered in costs calculations
-                            WWTPTO, WWTPFROM = nodesToNetwork[0], nodesFromNetwork[0]                       # WWTPs
-                                                                    
-                            # Update
-                            PathListToPotentialWWTP = InvertandswapID(inversearchPathWWTP)                  # swap ID and invert path
-                            pathBetweenWWTPs = readOnlyNodesID(archPathWWTP)                                # Only ID
-                            pathBetweenWWTPsInvert = pathBetweenWWTPs[::-1]                                 # Invert abd only ID
-                            archPathWWTPInvert = InvertandswapID(archPathWWTP)                              # swap ID and invert path
-    
-                            #arcpy.AddMessage("WWTOFROM: " + str(WWTPFROM))
-                            #arcpy.AddMessage("WWTO:     " + str(WWTPTO))
-                            
-                            # Add ArchPath to edges # new that full path is entered into edgeList
-                            for edge in archPathWWTP:
-                                newNode, oldNode = edge[0], edge[1][0]
-                                IDnew, cord_new, _, _, _, _ = getPns(newNode, nodes)
-                                IDold, cord_old, _, _, _, _ = getPns(oldNode, nodes)
-                                distance, slope, _ = distanceCalc3d(cord_new, cord_old)
-                                edgeList = addToEdgeList(edgeList, distance, slope, IDnew, IDold, cord_new, cord_old)
-    
-                            #=========================================
-                            # Check if networks need to be removedRemove networks
-                            # If there are intercrossed networks to remove, remove network nodes from sewers, clear nodes and add again to PN
-                            #=========================================                                                                                                              
-                            netWorkToRemove, needsNetworkRemoving = findNetworkToRemove(archPathWWTP, nodesToNetwork, nodesFromNetwork, sewers_NoCon, WWTPs)    # Find sub networks to remove
-        
-                            if needsNetworkRemoving == 1:
-                                #arcpy.AddMessage("Network needs to be removed")
-                                allNodesToAddToPN = []
-
-                                # Iterate over all wwts which needs to be deleted
-                                for wtpToDelet in netWorkToRemove:   
-                                    allNodesToDelet = breathSearch(wtpToDelet, sewers)          
-                                    nodes = clearFlow(nodes, allNodesToDelet)                   # Clear copypnts flow and pressure
-                                    pumps = removePumpsWhereNoNetwork(pumps, allNodesToDelet)   # Remove if there are pumps in between 
-                                    sewers = removeInSewers(sewers, allNodesToDelet)            # Update the Ps and delete all network nodes from sewers
-                                    WWTPs = delEntry(WWTPs, wtpToDelet)                         # delet WWTP
-                                    allNodesToAddToPN.append((wtpToDelet, allNodesToDelet))     # Append PN distances
-                                    sortedListWWTPs = delEntry(sortedListWWTPs, wtpToDelet)     # Delete WWTP
-                                    #arcpy.AddMessage("NETWORK is removed: " + str(wtpToDelet))
-                                    #arcpy.AddMessage(allNodesToDelet)
-                                
-                                sewers = appendToNetwork(sewers, archPathWWTP)                  # Add the path between the wwtps to the sewer network
-                                                 
-                            sewers_B1, sewers_B3 = dict(sewers), dict(sewers)                   # copy of sewers
-                            sewers_B1 = insertPathDirection(sewers_B1, PathListToPotentialWWTP) # Add all nodes between wwtps to copy of sewers
-                            sewers_B3 = insertPathDirection(sewers_B3, inversearchPathWWTP)     # Add all nodes between wwtps to copy of sewers
-                                                
-                            # Initialisation wwwtp reconnection
-                            nodes_BI = fastCopyNodes(nodes)
-                            nodes_B3 = fastCopyNodes(nodes)
-                            pumpWWTPListB1, pumpWWTPB3 = fastCopy(pumps), fastCopy(pumps)       # copy list with pumps
-                            flowWWFrom = getFlowWWTP(WWTPs, WWTPFROM)                           # Get flow of largestWWTPID (same as idwWWTPZero)
-                            flowWWTO = getFlowWWTP(WWTPs, WWTPTO)                               # Get flow of WWTPTO 
-                                                               
-                            notInaNetworkBeforeConnection = getNotInNetwork(pathBetweenWWTPs, sewers_NoCon)                                                                 # Get all nodes not in a network before interconnectin path is added
-                            notInaNetwork = getPointsNotInNetwork(pathBetweenWWTPs, nodesFromNetwork, nodesToNetwork)                                                       # Get all nodes not in a network after innterconnection path is added
-                            flowInitial_from, flowInitial_to = getFlowInitial(nodesFromNetwork, nodesToNetwork, nodes, flowWWFrom, flowWWTO, notInaNetworkBeforeConnection) # Calculate initial Flow:  if next node is in Network, substract flow from flowWWFrom 
-                                    
-                            # -----------
-                            # Cost Module
-                            # -----------
-
-                            # --------
-                            # Option 1
-                            # --------
-                            
-                            # Sewer Costs
-                            if len(nodesFromNetwork) > 1:
-                                nodes_BI = getInflowingNodes(nodes_BI, nodesFromNetwork, flowInitial_from, notInaNetworkBeforeConnection)       # Only the inFlow from other nodes on the path gets calculated
-                            else:
-                                nodes_BI = assignInitialFlow(nodes_BI, pathBetweenWWTPs, flowInitial_from, -1)                                  # Change flow in nodes of first element
-        
-                            if len(nodesToNetwork) > 1:
-                                nodes_BI = getInflowingNodes(nodes_BI, nodesToNetwork, flowInitial_to, notInaNetworkBeforeConnection)           # Only the inFlow from other nodes on the path gets calculated
-                            else:
-                                nodes_BI = assignInitialFlow(nodes_BI, pathBetweenWWTPs, flowInitial_to, 0)                                     # Change flow in nodes of last element
-
-                            nodes_BI = clearFlow(nodes_BI, notInaNetwork)                                                                       # Clear flow where not in starting or ending network
-                            nodes_BI = changeFlowAlongPath(nodes_BI, pathBetweenWWTPs)                                                          # Change Flow along the path in nodes_BI
-                            nodes_BI, inflowNodesWTPB1 = correctTD(nodes_BI, archPathWWTPInvert[:-1], minTD, WWTPs, maxTD, minSlope, sewers)    # Set all trench depth except inflow nodes to minimum trench depth
-                            nodes_BI, pumpWWTPListB1, edgeList1 = changeTD(nodes_BI, edgeList, pumpWWTPListB1, archPathWWTPInvert, maxTD, minSlope, inflowNodesWTPB1, sewers, minTD)
-                            pipeCostsB1, edgeList1 = costsBetweenWWTPs(pathBetweenWWTPs, edgeList1, nodes_BI, 0, pumpWWTPListB1, minTD, discountYearsSewers, interestRate, stricklerC, operationCosts, f_SewerCost)  # first zero: regular flow, second zero: proportional costs
-                                        
-                            # Pumping Costs
-                            pumpCostB1, _ = costPump(pathBetweenWWTPs, pumpWWTPListB1, pricekWh, pumpYears, interestRate)  # Calculate pump costs
-                                        
-                            # Option 1 - WWTPs costs
-                            wtpCostB1 = costWWTP((flowWWFrom + flowWWTO), EW_Q, wwtpLifespan, interestRate, fc_wwtpOperation, fc_wwtpReplacement)                 # WWTP-costs: Additional costs of building a larger WWTP
-                                            
-                            # --------
-                            # Option 2
-                            # --------
-                                                        
-                            # Sewer Costs       
-                            if len(nodesFromNetwork) == 0 and len(nodesToNetwork) == 0:
-                                pipeCostsB2 = 0                                                                                                                   # As there are none pipes on the way
-                            else:
-                                # The costs of the pipes on the way between the wwtps needs to be calculated
-                                pipeCostB2a, _ = costsBetweenWWTPs(nodesFromNetwork, edgeList, nodes, 0, pumps, minTD, discountYearsSewers, interestRate, stricklerC, operationCosts, f_SewerCost)      # first zero: regular flow, second zero: proportional costs
-                                pipeCostB2b, _ = costsBetweenWWTPs(nodesToNetwork, edgeList, nodes, 0, pumps, minTD, discountYearsSewers, interestRate, stricklerC, operationCosts, f_SewerCost)        # first zero: regular flow, second zero: proportional costs
-                                pipeCostsB2 = pipeCostB2a + pipeCostB2b                                                                                                                                 # sum costs of the two networks
-                                pumpCostB2A, _ = costPump(nodesFromNetwork, pumps, pricekWh, pumpYears, interestRate)                                         # [CHF] Calculate pump costs
-                                pumpCostB2B, _ = costPump(nodesToNetwork, pumps, pricekWh, pumpYears, interestRate)                                           # [CHF] Calculate pump costs
-                                pumpCostB2 = pumpCostB2A + pumpCostB2B
-                                        
-                            # WWTP costs   
-                            wtpCostB2a = costWWTP(flowWWFrom, EW_Q, wwtpLifespan, interestRate, fc_wwtpOperation, fc_wwtpReplacement)                            
-                            wtpCostB2b = costWWTP(flowWWTO, EW_Q, wwtpLifespan, interestRate, fc_wwtpOperation, fc_wwtpReplacement)
-                                
-                            if needsNetworkRemoving == 1:           # Calculate costs of crossed WWTPs
-                                sumCostcrossedWWTP = getCostsOfCrossedWWTPs(allNodesToAddToPN, pathBetweenWWTPs, WWTPS_noCon, sewers_NoCon, nodes_noCon, EW_Q, wwtpLifespan, interestRate, fc_wwtpOperation, fc_wwtpReplacement)
-                                wtpCostB2 = wtpCostB2a + wtpCostB2b + sumCostcrossedWWTP     # Total wwtp costs
-                            else:
-                                wtpCostB2 = wtpCostB2a + wtpCostB2b     # Total wwtp costs
-                                
-                            # --------
-                            # Option 3
-                            # --------
-                            
-                            # Sewer costs
-                            if len(nodesFromNetwork) > 1:  # Change nodes because of againstFlow (if needed) how it would look like with connection
-                                nodes_B3 = getInflowingNodes(nodes_B3, nodesFromNetwork, flowInitial_from, notInaNetworkBeforeConnection)
-                            else:
-                                nodes_B3 = assignInitialFlow(nodes_B3, pathBetweenWWTPs, flowInitial_from, -1)  # Change initial flow in nodes   
-                    
-                            if len(nodesToNetwork) > 1:
-                                nodes_B3 = getInflowingNodes(nodes_B3, nodesToNetwork, flowInitial_to, notInaNetworkBeforeConnection)
-                            else:
-                                nodes_B3 = assignInitialFlow(nodes_B3, pathBetweenWWTPs, flowInitial_to, 0)     # Change initial flow in nodes
-                            
-                            nodes_B3 = clearFlow(nodes_B3, notInaNetwork)                                       # Clear flow wheter there is no flow
-                            nodes_B3 = changeFlowAlongPath(nodes_B3, pathBetweenWWTPsInvert)                    # Change flow along the path
-                            nodes_B3, inflowNodesWTPB3 = correctTD(nodes_B3, pathBetweenWWTPsInvert[:-1], minTD, WWTPs, maxTD, minSlope, sewers)  # Set all trench depth except inflow nodes to minimum trench depth     
-                            nodes_B3, pumpWWTPB3, edgeList3 = changeTD(nodes_B3, edgeList, pumpWWTPB3, archPathWWTP, maxTD, minSlope, inflowNodesWTPB3, sewers, minTD)
-                                        
-                            # Pumping Costs
-                            pumpCostB3, _ = costPump(pathBetweenWWTPsInvert, pumpWWTPB3, pricekWh, pumpYears, interestRate)  # Calculate pump costs
-                                        
-                            # Sewer costs
-                            pipeCostB3, edgeList3 = costsBetweenWWTPs(pathBetweenWWTPsInvert, edgeList3, nodes_B3, flowInitial_to, pumpWWTPB3, minTD, discountYearsSewers, interestRate, stricklerC, operationCosts, f_SewerCost)  # first zero: regular flow, second zero: proportional costs
-                                    
-                            # WWTP costs            
-                            wtpCostA3 = wtpCostB1                             # Total wwtp costs
-                            totCostBI = pipeCostsB1 + wtpCostB1 + pumpCostB1  # Total Costs Option 1        
-                            totCostB2 = pipeCostsB2 + wtpCostB2 + pumpCostB2  # Total Costs Option 2
-                            totCostB3 = pipeCostB3 + wtpCostA3 + pumpCostB3   # Total Costs Option 3
-        
-                            #arcpy.AddMessage("-------------Cost Comparison----------") 
-                            #arcpy.AddMessage("totCostBI: " + str(totCostBI))
-                            #arcpy.AddMessage("totCostB2: " + str(totCostB2))
-                            #arcpy.AddMessage("totCostB2: " + str(totCostB3))
-                            
-                            #print("-------------Cost Comparison----------") 
-                            #print("totCostBI: " + str(totCostBI))
-                            #print("totCostB2: " + str(totCostB2))
-                            #print("totCostB2: " + str(totCostB3))
-
-                            wwtpSWAP, wwtpToWwtopConncetion = costComparison(totCostBI, totCostB2, totCostB3, 0, 0, 1, forceZ, finishedExpansion) # Compare costs, don't consider reasonable  costs
-                                
-                            if totCostBI - totCostB2 < totCostB3- totCostB2:
-                                mergeCosts = totCostBI - totCostB2
-                            else:
-                                mergeCosts = totCostB3- totCostB2
-                                
-                            # Update if wwtp reconnection took place
-                            if wwtpToWwtopConncetion == 1:
-                                WWTPs, wwtpsIterate = checkIfWWTPwereConnected(pathBetweenWWTPs, wwtpsIterate, WWTPs)  # Check if by a wwtp connection another wwpt was connected as well If yes, delete these
-                
-                                # Changes depending on options
-                                if wwtpSWAP == 1:
-                                    #arcpy.AddMessage("INFO: WWTP MERGE, SWAP. Delete WWTP: " + str(WWTPFROM))
-                                    #arcpy.AddMessage("CurrentCheckedWWTP: " + str(CurrentCheckedWWTP))
-                                    wwtpsIterate = delEntry(wwtpsIterate, WWTPFROM)                            # Femove found wwtp from copylistWTP
-                                    WWTPs = delEntry(WWTPs, WWTPFROM)                                          # Delete wwtp
-                                    edgeList = fastCopy(edgeList3)                                             # Replace list with edges
-                                    nodes = fastCopyNodes(nodes_B3)                                            # Replace nodes by new nodes with new flow
-                                    WWTPs = updateFlowInWWTP(WWTPs, nodes, WWTPTO)                             # Update flow in WWTPs
-                                    pumps = fastCopy(pumpWWTPB3)                                               # Replace pumps
-                                    sewers = dict(sewers_B3)                                                   # Add new connection to sewers 
-                                    expansionM = False
-                                    sortedListWWTPs = delEntry(sortedListWWTPs, WWTPFROM)                      # Delete in wwtps to check for merging
-                                    iterateMergeOptions = False                                                
-                                        
-                                    # If you want to merge until all but one WWTP are connected
-                                    if ZtoReach > hypoZWeighted and finishedExpansion == 1:
-                                        copyList = []
-                                        newFlow = getFlowWWTP(WWTPs, WWTPTO)
-                                        _, corrWWTPTO, _, _, _, _ = getPns(WWTPTO, nodes)
-                                        for e in mergeCostStorage:
-                                            if e[1][0] != WWTPFROM and e[3][0] != WWTPFROM:
-                                                if e[1][0] == WWTPFROM or e[3][0] == WWTPFROM:
-                                                    if e[1][0] == WWTPFROM:
-                                                        eNew = [e[0], [WWTPTO, newFlow], WWTPTO, e[3]]
-                                                        copyList.append(eNew)
-                                                    else:
-                                                        eNew = [e[0], e[1], e[2], [WWTPTO, corrWWTPTO]]
-                                                        copyList.append(eNew)
-                                                else:
-                                                    copyList.append(e)
-                                        mergeCostStorage = copyList
-
-                                    # Calculate costs of current network, wwtps and if hypothetically all other wwtps wouldn't be connected but each have a decentral conncetion
-                                    if iterativeCostCalc == 1 and ZtoReach > hypoZWeighted:
-                                        hypoZ, hypoZWeighted, hypoCosts, hypoPumpCosts, hypoWWTPCosts, hypoPublicPipeCosts, _ = getFullHypotheticalCosts(aggregatetPoints, WWTPs, sewers, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement)
-                                            
-                                        if hypoZ > hypoZOld:
-                                            totalSystemCosts.append([hypoZ, hypoZWeighted, hypoCosts, hypoPumpCosts, hypoWWTPCosts, hypoPublicPipeCosts ])
-                                        hypoZOld = hypoZ
-        
-                                    # Create new PN and force connetion in nodes and restart the expansion-module if there was an intermediate network in between
-                                    if needsNetworkRemoving == 1:
-                                        PN, nodes, sortedListWWTPs = updatePrimEdges(allNodesToAddToPN, sewers, nodes, sortedListWWTPs)
-
-                                        if PN == []: # ALL deleted nodes were on path, don't quit expnasion module
-                                            break 
-                                        else:
-                                            #arcpy.AddMessage("Return to Expansion Module...")
-                                            nodes = removeForceCriteria(nodes, WWTPFROM)
-                                            nodes = adForceCriteria(nodes, allNodesToAddToPN)                   # Add a force connection criteria that all deleted nodes get connected in the EM
-                                            return nodes, sewers, pumps, WWTPs, PN, edgeList, totalSystemCosts  # Return to expansion-module
-                                    break # Is needed to exit merging options
-                                else:
-                                    #arcpy.AddMessage("INFO: WWTP MERGE, NO SWAP. Delete WWTP: " + str(WWTPTO) + "  " + str(CurrentCheckedWWTP))  # print
-                                    sortedListWWTPs = delEntry(sortedListWWTPs, WWTPTO)                         # Delete in wwtps to check for merging
-
-                                    edgeList = fastCopy(edgeList1)                                              # Prim Edges
-
-                                    wwtpsIterate = delEntry(wwtpsIterate, WWTPTO)                               # remove found wwtp from wwtpsIterate
-                                    WWTPs = delEntry(WWTPs, WWTPTO)                                             # Delete wwtp
-                                    nodes = fastCopyNodes(nodes_BI)                                             # Replace nodes by new nodes with new flow
-                                    WWTPs = updateFlowInWWTP(WWTPs, nodes, WWTPFROM)                            # Update flow in WWTPs
-                                    pumps = fastCopy(pumpWWTPListB1)                                            # Replace pumps list
-                                    sewers_Current = appendToSewers(sewers_Current, pathBetweenWWTPs[1:-1])     # Add new connection to sewers sewers_Current                                                                # Used for next checking if connection is wortwhile
-                                    sewers = dict(sewers_B1)                                                    # Add new connection to sewers    
-                                    expansionM = False
-                                    iterateMergeOptions = False                                                 
-                                               
-                                    # If Z = 1 wants to be reached:
-                                    if ZtoReach > hypoZWeighted:
-                                        copyList = []
-                                        newFlow = getFlowWWTP(WWTPs, WWTPFROM)
-                                        _, corWWTOFROM, _, _, _, _ = getPns(WWTPFROM, nodes)
-                                        for e in mergeCostStorage:
-                                            if e[1][0] != WWTPTO and e[3][0] != WWTPTO:
-                                                # Replace mergecost elements
-                                                if e[1][0] == WWTPTO:
-                                                    eNew = [e[0], [WWTPFROM, newFlow], WWTPFROM, e[3]]
-                                                    copyList.append(eNew)
-                                                if e[3][0] == WWTPTO:
-                                                    eNew = [e[0], e[1], e[2], [WWTPFROM, corWWTOFROM]]
-                                                    copyList.append(eNew)
-                                                else:
-                                                    copyList.append(e)
-                                        mergeCostStorage = copyList
-                                                
-                                    # Calculate costs of current network, wwtps and if hypothetically all other wwtps wouldn't be connected but each have a decentral conncetion
-                                    if iterativeCostCalc == 1 and ZtoReach > hypoZWeighted:    
-                                        hypoZ, hypoZWeighted, hypoCosts, hypoPumpCosts, hypoWWTPCosts, hypoPublicPipeCosts, _ = getFullHypotheticalCosts(aggregatetPoints, WWTPs, sewers, EW_Q, wwtpLifespan, interestRate, pumps, pumpYears, pricekWh, edgeList, nodes, stricklerC, discountYearsSewers, operationCosts, f_SewerCost, fc_wwtpOperation, fc_wwtpReplacement)
-                                        if hypoZ > hypoZOld:
-                                            totalSystemCosts.append([hypoZ, hypoZWeighted, hypoCosts, hypoPumpCosts, hypoWWTPCosts, hypoPublicPipeCosts])
-                                        hypoZOld = hypoZ
-                                        
-                                    if needsNetworkRemoving == 1:
-                                        PN, nodes, sortedListWWTPs = updatePrimEdges(allNodesToAddToPN, sewers, nodes, sortedListWWTPs)   
-                                            
-                                        if PN == []: # ALL deleted nodes were on path, therefore don't quit expansion module
-                                            break 
-                                        else:
-                                            #arcpy.AddMessage("Return to Expansion Module...")
-                                            nodes = removeForceCriteria(nodes, WWTPFROM)
-                                            nodes = adForceCriteria(nodes, allNodesToAddToPN)                   # Add a force connection criteria that all deleted nodes get connected in the EM
-                                            return nodes, sewers, pumps, WWTPs, PN, edgeList, totalSystemCosts  # Return to expansion-module
-
-                                    # Create new PN and force connetion in nodes and restart the expansion-module
-                                    if needsNetworkRemoving == 1:
-                                        if PN == [] and OnlyExecuteMerge != 1:                                  # ALL deleted nodes were on path, don't quit expnasion module
-                                            break 
-                                        else:
-                                            nodes = removeForceCriteria(nodes, WWTPTO)                          # Remove force conneciton criteria
-                                            return nodes, sewers, pumps, WWTPs, PN, edgeList, totalSystemCosts  # Return to expansion-module
-                                    break                                                                       # Stop iteration merge options
-                            else:                                                                               # If no merging took place Stop iteration
-                                #arcpy.AddMessage("Do not make any changes...")
-                                wwtpsIterate = delEntry(wwtpsIterate, WWTPFROM)                                         # delete wwtps in iteration list of wwtps
-                                sortedListWWTPs = fastCopy(sortedListWWTPs_noCon)                                       # Restore as it was before because not connection took place
-                                sewers = dict(sewers_NoCon)                                                             # Restore as it was before because not connection took place
-                                pumps = fastCopy(pumps_noCon)                                                           # Restore as it was before because not connection took place
-                                nodes = fastCopyNodes(nodes_noCon)                                                      # Restore as it was before because not connection took place
-                                WWTPs = fastCopy(WWTPS_noCon)                                                           # Restore as it was before because not connection took place
-                                PN = fastCopy(PN_noCon)                                                                 # Restore as it was before because not connection took place
-                                expansionM = False                                                                      # If no reconnection, stop checking
-                                iterateMergeOptions = False                                                             # stop iterating options
-                                mergeCostStorage.append([mergeCosts, CurrentCheckedWWTP, checkBackConnectionID, mOpt])  # In case no merge store costs of additional merging. This is used in case we want to force higher Zw values
-
-                    # If merge took place and no swap took place, add the WWTP to sortedListWWTPs to check again. 
-                    if wwtpToWwtopConncetion == 1:
-                        if wwtpSWAP == 1:
-                            #In case the WWTPTO is not in sortedListWWTPs, insert at top position
-                            addWWTPagain = 1
-                            for i in sortedListWWTPs:
-                                if i[0] == WWTPTO: 
-                                    addWWTPagain = 0
-                                    break
-                            if addWWTPagain == 1:
-                                for wwtp in WWTPs:
-                                    if wwtp[0] == WWTPTO:
-                                        sortedListWWTPs.insert(0, [wwtp[0], wwtp[1]])
-                    else:                                                           # If all three options were not merged
-                        del sortedListWWTPs[0]                                      # Remove wwtp to check     
-                break                              
-
-    #arcpy.AddMessage("Quit Merging Module..." )
-    return nodes, sewers, pumps, WWTPs, PN, edgeList, totalSystemCosts
 
 def getCheapestMerge(mergeCostStorage, WWTPs):
     '''
@@ -4372,7 +3997,7 @@ def createPolyPointWWTP(pntsFlow, outListStep_point):
         pointList.append(arcpy.PointGeometry(punkte))
 
     if len(pointList) == 0:
-        print("Could not create PolyPoint as no points to draw are found")
+        arcpy.AddMessage("Could not create PolyPoint as no points to draw are found")
         draw = 0
         return draw
     
@@ -4394,7 +4019,7 @@ def createPolyPointPump(pntsFlow, outListStep_point):
     punkte, pointList, draw = arcpy.Point(), [], 1
 
     if len(pntsFlow) == 0:
-        print("INFO: No pumps are drawn ")
+        arcpy.AddMessage("INFO: No pumps are drawn ")
     
     for entry in pntsFlow:
         punkte.X, punkte.Y = entry[1], entry[2]
@@ -4417,7 +4042,6 @@ def writeWWTPs(shapefile_path, pointListNear):
     """
     from arcpy import env
     env.workspace = shapefile_path
-    
     arcpy.AddField_management(shapefile_path, "ID_scratch", "FLOAT")
     arcpy.DeleteField_management(shapefile_path, "Id")              # Delete automatically created field
     arcpy.AddField_management(shapefile_path, "ID", "FLOAT")
@@ -4433,11 +4057,6 @@ def writeWWTPs(shapefile_path, pointListNear):
         rows.updateRow(row)
         cnt += 1
     return
-
-
-
-
-
 
 def writeStartnode(shapefile_path, startnodeID):
     """
@@ -4667,19 +4286,32 @@ def addedgesID(edges, streetVertices):
     
     Output Arguments:
     newEdges              --   List with edges and distance: (((id, p1x, p1y), (id, p1x, p1y), distance, slope), .....)
-    """
+    """  
     pipeDiameter =  0.0 # Initially it is zero
     newEdges = []
     for edge in edges:
         pnt1, pnt2 = edge[0], edge[1]
         p1x, p1y, p2x, p2y = pnt1[0], pnt1[1], pnt2[0], pnt2[1]
+        
+        
+
+        #arcpy.AddMessage("-------------------")
+        #arcpy.AddMessage("pnt1: " + str(pnt1))
+        #arcpy.AddMessage("pnt2: " + str(pnt2))
 
         for i in streetVertices:
             if i[1] == p1x and i[2] == p1y:
                 p0 = [i[0], p1x, p1y, i[3]]
             if i[1] == p2x and i[2] == p2y:
                 p1 = [i[0], p2x, p2y, i[3]]
-                
+        
+        #arcpy.AddMessage("pnt3: " + str(p0))
+        #arcpy.AddMessage("pnt4: " + str(p1))
+        
+        # Remove closed loops
+        if p0[1] == p1[1] and p0[2] == p1[2]:
+            continue
+        
         distanz, slope, _ = distanceCalc3d((p0[1], p0[2], p0[3]), (p1[1], p1[2], p1[3]))
         
         if distanz != 0:
@@ -4991,6 +4623,7 @@ def updatefieldsPoints(shapefile_path):
     arcpy.CalculateField_management(shapefile_path, "X_END", xEnd, "PYTHON")
     arcpy.CalculateField_management(shapefile_path, "Y_START", yStart, "PYTHON")
     arcpy.CalculateField_management(shapefile_path, "Y_END", yEnd, "PYTHON")
+    arcpy.AddMessage("Updatet splitet lines")
     return
 
 def updateFieldNode(shapefile_path):
@@ -5116,7 +4749,7 @@ def writeFieldNodesPUMPS(shapefile_path, pointListNear):
         cnt += 1
     return
 
-def initialPrimCalc(firstIteration, origin, nodes, PN, initialPN):
+def initialPrimCalc(firstIteration, origin, nodes, PN, initialPN, rasterSize, rasterPoints):
     """
     This functions calculateds the initial prim distances.
     
@@ -5140,7 +4773,24 @@ def initialPrimCalc(firstIteration, origin, nodes, PN, initialPN):
             
             # if not point to itself, point not already connected and no ArchPoint 
             if flowCriteria > 0 and idp0 != idp1:  
-                distanceinclSlope, _, _ = distanceCalc3d(p1, p0)    
+                distanceinclSlope, _, hDiff = distanceCalc3d(p1, p0)  
+                #distanceinclSlope, _, _ = distanceCalc3dThirdPaper(p1, p0) 
+                
+                # Third Paper 19.11.2015
+                hillHeight = 25 #m
+                distanceRadiusToCheckForHill = 1500
+                
+                if distanceinclSlope < distanceRadiusToCheckForHill:
+                    crossHill = crossingHillTest(rasterSize, rasterPoints, p0, p1, hillHeight)  # Hill Cross Test
+                else:
+                    crossHill = True # do not check but push away
+                    
+                if crossHill == True:
+                    distanceinclSlope = distanceinclSlope * 30 # Distance weightning if there is a hill inbetween
+                
+                if hDiff < 0:  # If Minus PUsh away
+                    distanceinclSlope = distanceinclSlope * 10 # Distance Weighning if it goesdown$
+
                 distFak = 1                                                         
                 PN.append([distanceinclSlope, idp0, idp1, i[1], i[2], i[3], distFak])
 
@@ -5457,6 +5107,21 @@ def writeTotxt(outListStep_point, name, inList):
     myDocument.close()
     return
 
+def writeTotxtPlotData(outListStep_point, name, inList):
+    """
+    This functions writes to a .txt file.
+    
+    Input Arguments: 
+    outListStep_point    --    Path to folder where .txt file is stored
+    name                 --    Name of .txt file
+    inList               --    List with entries to write to .txt file    
+    """
+    outfile = outListStep_point + name + ".txt"
+    myDocument = open(outfile, 'w')
+    myDocument.write(str(inList))
+    myDocument.close()
+    return
+
 def writeOutPipes(outListStep_point, name, inList):
     """
     This functions writes to a .txt file.
@@ -5574,75 +5239,6 @@ def readRasterPoints(in_FC, anzForID):
         raise Exception("Error: Raster dimension is zero.")
     return pointListNear, rasterCellSize
 
-
-
-
-def readVRMPnts(in_FC):
-    """
-    This function reads out all raster points and calculates the raster cell size
-
-    Input Arguments: 
-    in_FC              --    Path to raster points.
-    anzForID           --    Number of aggregated nodes to consider in SNIP.
- 
-    Output Arguments:
-    rasterCellSize     --    raster Cell Size
-    """
-    VRM = 0
-    rows = arcpy.SearchCursor(in_FC) 
-    fields = arcpy.ListFields(in_FC) 
-    cnt = 0
-    for row in rows:
-        for field in fields:
-            if field.name == "GRID_CODE":  # Z-Value
-                VRMlocal = row.getValue(field.name)
-                VRM += VRMlocal
-                cnt += 1
-    VRMAverage = VRM / cnt
-    return VRMAverage
-
-def readStatistics(pathInFile):
-    """
-    This functions reads out statistical data from a .txt file
-    
-    Input Arguments: 
-    pathInFile        --    Path to .txt file
-    
-    Output Arguments:
-    statistics        --      Statistics
-    """
-    inputfile = open(pathInFile, 'r')   # Set Path to existing .txt-File with R results
-    lineArray = inputfile.readlines()   # Read in single result lines from txtfile into List
-    lines = []                          # Create empty list to fill in whole txt File with results
-    position = 0                        
-    while position < len(lineArray):    # Iterate through list with line-results by position
-        entry = lineArray[position]     # Get line at position
-        lines.append(entry)             # Append line at position to empty List
-        position += 1                   # For the loop
-    inputfile.close()                   # Close result .txt file 
-
-    id_Startnode = float(lines[0])
-    sources = float(lines[1][:-1])
-    sinks = float(lines[2][:-1])
-    degCen = float(lines[3][:-1])
-    degCenWeighted = float(lines[4][:-1])  
-    nrOfNeighboursDensity = float(lines[5][:-1])
-    totalPipeLength = float(lines[6][:-1])   
-    avreageTrenchDepth = float(lines[7][:-1])   
-    averageHeight = float(lines[8][:-1])   
-    averageWWTPSize = float(lines[9][:-1])   
-    medianWWTOSize = float(lines[10][:-1])   
-    completePumpCosts = float(lines[15][:-1])
-    completeWWTPCosts = float(lines[16][:-1])
-    completePublicPipeCosts = float(lines[17][:-1])
-    totCostPrivateSewer = float(lines[18][:-1])
-    totSystemCostsNoPrivate = float(lines[19][:-1])
-    totSystemCostsWithPrivate = float(lines[20])
-
-    statistics = [id_Startnode, sources, sinks, degCen, degCenWeighted, nrOfNeighboursDensity, totalPipeLength, avreageTrenchDepth, averageHeight, averageWWTPSize, medianWWTOSize, 
-                  completePumpCosts, completeWWTPCosts, completePublicPipeCosts, totCostPrivateSewer, totSystemCostsNoPrivate, totSystemCostsWithPrivate]
-    return statistics
-
 def readLines(pathInFile):
     """
     This functions reads out lines of a .txt file
@@ -5713,6 +5309,30 @@ def readInRasterSize(pathInFile):
     inputfile.close()                       # Close result .txt file 
     rasterSize = float(txtFileList[0][:-1]) # Read out only string
     return rasterSize
+
+def readInAreaTextFile(pathInFile):
+    """
+    This functions reads in a .txt file.
+    
+    Input Arguments: 
+    pathInFile           --    Path to .txt file
+    
+    Output Arguments:
+    rasterSize        --      Raster Size
+    """
+    inputfile = open(pathInFile, 'r')       # Set Path to existing .txt-File with R results
+    lineArray = inputfile.readlines()       # Read in single result lines from txtfile into List
+    txtFileList, position = [], 0           # Create empty list to fill in whole txt File with results
+    while position < len(lineArray):        # Iterate through list with line-results by position
+        entry = lineArray[position]         # Get line at position
+        txtFileList.append(entry)           # Append line at position to empty List
+        position += 1                   
+    inputfile.close()                       # Close result .txt file 
+
+    areaCaseStudy = float(txtFileList[0]) # Read out only string
+    arcpy.AddMessage(areaCaseStudy)
+    return areaCaseStudy
+
 
 def readInStartnode(pathInFile):
     """
@@ -6056,7 +5676,6 @@ def readInRasterPoints(pathRasterPoints):
     Output Arguments:
     demPnts                --    DEM Points
     """
-    print("READ IN RASTER PINT SNIP FUNCTIONS")
     txtFileList = readLines(pathRasterPoints)  
     demPnts = []
     for i in txtFileList:
@@ -6300,6 +5919,9 @@ def getStatistics(startnode, sewers, pointsPrim, aggregatetPoints, WWTPs, edgeLi
     Output Arguments:
     listWWTPwithAggregatedNodes    --    List with wwtp where the nr of aggregated nodes is added
     '''
+    arcpy.AddMessage(" ")
+    arcpy.AddMessage("Statistics")
+    arcpy.AddMessage("----------")
     totalPublicPipeLength, totalPrivatePipeLenth = 0.0, 0.0
 
     for i in sewers:
@@ -6316,21 +5938,18 @@ def getStatistics(startnode, sewers, pointsPrim, aggregatetPoints, WWTPs, edgeLi
                     distance = distanceCalc2d((geb[1], geb[2]), (pt_to1_X, pt_to1_Y))
                     totalPrivatePipeLenth += distance       # sum private pipe length
                     break
-
-    print("Total public pipe Length:  " + str(totalPublicPipeLength))
-    print("Total private pipe Length: " + str(totalPublicPipeLength))
+    
+    arcpy.AddMessage(" ")
+    arcpy.AddMessage("Total public pipe Length:  " + str(totalPublicPipeLength))
+    arcpy.AddMessage("Total private pipe Length: " + str(totalPrivatePipeLenth))
+    arcpy.AddMessage(" ")
         
     # Calculate degree of centralization
-
-    # Classical Definition of Z
     sources = len(aggregatetPoints)
     sinks = len(WWTPs)
     degCen = round((float(sources) - float(sinks)) / float(sources), 4)
-        
-    print("Non-weighted Degree of centrality: " + str(degCen))
-    print("Nr of Sources: " + str(sources))
-    print("Nr of sinks: " + str(sinks))
-        
+    arcpy.AddMessage("Non-weighted Degree of centrality: " + str(degCen))                       # Classical Definition of Z according to Ambros (2009)
+
     # Weighted Definition of Z
     listWWTPwithAggregatedNodes = getAggregatedNodesinListWWTP(WWTPs, sewers, aggregatetPoints) # Get aggregated nodes
     sumFlow, weightedTerm = 0, 0
@@ -6340,7 +5959,8 @@ def getStatistics(startnode, sewers, pointsPrim, aggregatetPoints, WWTPs, edgeLi
         weightedTerm += float((i[1]/i[2]))
               
     degCenWeighted = (sumFlow - weightedTerm) / sumFlow
-    print("weighted degree of centrality: " + str(degCenWeighted))
+    arcpy.AddMessage("weighted degree of centrality: " + str(degCenWeighted))
+    arcpy.AddMessage(" ")
         
     # Calculate average trench depth
     cnt = 0.0
@@ -6351,7 +5971,7 @@ def getStatistics(startnode, sewers, pointsPrim, aggregatetPoints, WWTPs, edgeLi
             cnt += 1
         
     avreageTrenchDepth = avreageTrenchDepth / cnt
-    print("Average Trench Depth: " + str(avreageTrenchDepth))
+    arcpy.AddMessage("Average Trench Depth: " + str(avreageTrenchDepth))
         
     # Calculate height of pipe network
     cnt = 0.0
@@ -6362,7 +5982,7 @@ def getStatistics(startnode, sewers, pointsPrim, aggregatetPoints, WWTPs, edgeLi
             cnt += 1
         
     averageHeight = averageHeight / cnt
-    print("Average height of sewer network: " + str(averageHeight))
+    arcpy.AddMessage("Average height of sewer network: " + str(averageHeight))
            
     # Average wwtp size
     averageWWTPSize, totFlow = 0, 0
@@ -6374,562 +5994,571 @@ def getStatistics(startnode, sewers, pointsPrim, aggregatetPoints, WWTPs, edgeLi
         cnt += 1
     averageWWTPSize = averageWWTPSize / cnt
         
-    '''# Calculate median wwtpSize
-    medianWWTPSize = 0
-    
-    # Sort list according to size
-    sortedWWTPs = sorted(WWTPs, key=lambda WWTPs: WWTPs[1]) #Sort tuple according to size
-    anzWWTP = len(sortedWWTPs)
-    boolTest = anzWWTP % 2
-
-    # Get median
-    if boolTest == 0 and anzWWTP > 1: # If odd number
-        medianPosition= int(((anzWWTP-1)/2.0) - 0.5)
-        medianWWTPSize = sortedWWTPs[medianPosition]
-    else:
-        medianPosition= int((anzWWTP-1)/2.0)
-        medianWWTPSize = (sortedWWTPs[medianPosition][1] + sortedWWTPs[medianPosition + 1][1])/2
-    '''
-    medianWWTPSize = 0
-    
-    # Calculate pipe size distribution
-    to10EW, von10To100EW, von100To1000EW, over1000EW = 0, 0, 0, 0
-        
-    for i in WWTPs:
-        if (i[1]*1000)/EWQuantity <= 10: # Flow in m3 divided by flowPerEW
-            to10EW += i[1]
-        if (i[1]*1000)/EWQuantity > 10 and (i[1]*1000)/EWQuantity <= 100:
-            von10To100EW += i[1]
-        if (i[1]*1000)/EWQuantity > 100 and (i[1]*1000)/EWQuantity <= 1000:
-            von100To1000EW += i[1]
-        if (i[1]*1000)/EWQuantity > 1000:
-            over1000EW += i[1]
-            
-    p_to10EW = (to10EW / totFlow) * 100
-    p_10to100EW = (von10To100EW) * 100
-    p_100to1000EW = (von100To1000EW / totFlow) * 100
-    p_over1000EW = (over1000EW / totFlow) * 100
-        
     # Statistics
-    statistics = [startnode, sources, sinks, degCen, degCenWeighted, nrOfNeighboursDensity, totalPublicPipeLength, totalPrivatePipeLenth, avreageTrenchDepth, averageHeight, averageWWTPSize, medianWWTPSize, p_to10EW, p_10to100EW, p_100to1000EW, p_over1000EW]
+    statistics = [startnode, sources, sinks, degCen, degCenWeighted, nrOfNeighboursDensity, totalPublicPipeLength, totalPrivatePipeLenth, avreageTrenchDepth, averageHeight, averageWWTPSize]
     return statistics
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-def averageNearestNeighborDistance(buildings):
-    '''
-    input: 
-    buildings    -    Buildings
+def getIntersection(lineA, lineB):
     
-    Output:
-    ANN          -    ANN    
-    '''
-    #TopLef, BottomRight = getCornerPoints(buildings)                  # Get corner coordinates
-    #A = ((BottomRight[0] - TopLef[0]) * (TopLef[1] - BottomRight[1]))# Area of Study in m2
+    # lineA = [[CR, COST], ...]
     
-    A = 9018170                                                       # Fixed Area of 3 km square for paper
-    nrNodes = len(buildings)                                          # Number of Nodes
-    
-    # Calculate nearest feature for each point
-    SumOfNearestNeigbhour = 0
-    for b in buildings:
-        nearDi = 99999999999999                                       # Nearest Distance of a point
-        for e in buildings:                                           # Search distance to closest point
-            dst = distanceCalc2d((b[0], b[1]), (e[0], e[1]))
-            if dst != 0 and dst < nearDi:
-                nearDi = dst
-        SumOfNearestNeigbhour += nearDi
-
-    De = 0.5 / ((nrNodes/float(A))**0.5)                              # De
-    Do = SumOfNearestNeigbhour / nrNodes                              # Do
-    ANN = float(Do) / float(De)                                       # ANN
-    return ANN
-
-def collectData(mainFolder):
-    '''
-    This function iterates different folders with stored results. This is used to only exectue the merging module
-    for larger areas.
-    
-    Input:
-    mainFolder     -    Path with stored results. This is only the main Folder.
-    
-    Output:
-    '''
-    clusterCalculation = 0
-    
-    # Iterate Folders
-    def getAllFolders(mainFolder):
-        folderPaths = []
-        folderList = os.listdir(mainFolder) # Get the folders
-        folderList.sort()
-        for folder in folderList:
-            #folderPaths.append(mainFolder + "\\" + folder + "\\" + "_SNIP" + "\\" + "ResultAsTxt" + "\\")
-            folderPaths.append(mainFolder + folder + "\\" + "_SNIP" + "\\" + "ResultAsTxt" + "\\")
-
-        return folderPaths
-    
-    folders = getAllFolders(mainFolder)     # Get folder paths
-    
-    uniqueID = 1                    # Unqiue ID for merging differetn data sets
-    
-    # Create global data sets
-    union_streetNetwork = {}
-    union_sewers = {}
-    union_edgeList = []         
-    union_WWTPs = []           
-    union_nodes = []            
-    union_aggregatetPoints = [] 
-    union_pumps = []
-    union_sewers_Current = []
-    global_lookUpTable = {}         # Look up tables with unique ID and Coordinate
-    union_buildings = [] 
-    union_InParameter = []
-    union_buildPoints = []
-    
-    for folder in folders:          # Iterate folders to summarize different results
-        lookUpTable = {}            # oldID: [NewID, x,y,z]  Dictionary to store all local nodes as lookup
-        #arcpy.AddMessage("Collectin data from folder: " + str(folder))
-                           
-        # Read in txt files
-        pathEdgeList = folder + "edgeList" + ".txt" 
-        pathStreetNetwork = folder + "streetNetwork" + ".txt"
-        pathWWTPs = folder + "WWTPs" + ".txt"
-        pathNodes = folder + "nodes" + ".txt"
-        pathAggregatetPoints = folder + "aggregatetPoints" + ".txt"
-        pathPumps = folder + "pumps" + ".txt"
-        pathSewers_Current = folder + "sewers_Current" + ".txt"
-        pathSewers = folder + "sewers" + ".txt"
-        pathBuildings = folder + "buildings" + ".txt"
-        pathInParameter = folder + "inParameter" + ".txt"
-        pathBuildPoints = folder + "buildPoints" + ".txt"
+    # Get all segments of line A & B
+    segmentsA, seg, cnt = [], [], 0
+    for i in lineA[:-1]:
+        seg.append(i)
+        if cnt == 1:
+            segmentsA.append(seg)
+            seg = [i]
+            #cnt = 0
+        cnt = 1
         
-        edgeList = readInedgesID(pathEdgeList)                      # Read in Street Network
-        streetNetwork = readInDictionary(pathStreetNetwork)         # Read in edges List
-        WWTPs = readInWWTPs(pathWWTPs)                              # Read in WWTPs
-        nodes = readInforSNIP(pathNodes)
-        aggregatetPoints = readInforSNIP(pathAggregatetPoints)
-        pumps = readInPumps(pathPumps)
-        sewers_Current = readInSewersCurrent(pathSewers_Current)
-        sewers = readInSewers(pathSewers)
-        buildings = readInbuildings(pathBuildings, clusterCalculation)
-        inParameter = readInParameters(pathInParameter)
-        buildPoints = readInbuildPoints(pathBuildPoints)           # Read in buildings points
-
-        # Check if the same parameters
-        if union_InParameter == []:
-            union_InParameter = inParameter
-        else:
-            for i in range(len(union_InParameter)):
-                if union_InParameter[i] != inParameter[i]:
-                    raise Exception("ERROR: Not the same parameters are used")
-        
-        # ------------------------------------                                
-        # Create Dictionary with old and new ID and update edgeList
-        # ------------------------------------
-        for i in edgeList:
-            oldID1, x1, y1, z1 = i[0][0], i[0][1], i[0][2], i[0][3]
-            oldID2, x2, y2, z2 = i[1][0], i[1][1], i[1][2], i[1][3]
-            existsAlready1, existsAlready2 = 0, 0
-            
-            for pnt in global_lookUpTable:
-                if global_lookUpTable[pnt][1] == x1 and global_lookUpTable[pnt][2] == y1:
-                    existsAlready1 = 1
-                    existingID1 =  global_lookUpTable[pnt][0]
-                    break 
-            
-            if existsAlready1 == 0:
-                lookUpTable[oldID1] = [uniqueID, x1, y1, z1]
-                global_lookUpTable[oldID1] = [uniqueID, x1, y1, z1]
-                ID1 = uniqueID
-                uniqueID += 1
-            else:
-                global_lookUpTable[oldID1] = [existingID1, x1, y1, z1]
-
-            # To pnt 2
-            for pnt in global_lookUpTable:
-                if global_lookUpTable[pnt][1] == x2 and global_lookUpTable[pnt][2] == y2:
-                    existsAlready2 = 1
-                    existingID2 = global_lookUpTable[pnt][0]
-                    break
-            
-            if existsAlready2 == 0:
-                lookUpTable[oldID2] = [uniqueID, x2, y2, z2]
-                global_lookUpTable[oldID2] = [uniqueID, x2, y2, z2]
+    segmentsB, seg, cnt = [], [], 0
+    for i in lineB[:-1]:
+        seg.append(i)
+        if cnt == 1:
+            segmentsB.append(seg)
+            seg = [i]
+        cnt = 1
    
-                ID2 = uniqueID
-                uniqueID += 1
-                
-            else:
-                global_lookUpTable[oldID2] = [existingID2, x2, y2, z2] 
-             
-
-            # Update edgeList
-            if existsAlready1 == 0 or existsAlready2 == 0:
-                if existsAlready1 == 1:
-                    newEdge = [[existingID1, i[0][1], i[0][2], i[0][3]], [ID2, i[1][1], i[1][2], i[1][3]], i[2], i[3], i[4], i[5]]
-                    union_edgeList.append(newEdge)
+    # Compare all paires from one line with all paires from second line
+    # Segment: [[x1, y1], [x2, y2]]
+    intersections = []
     
-                if existsAlready2 == 1:
-                    newEdge = [[ID1, i[0][1], i[0][2], i[0][3]], [existingID2, i[1][1], i[1][2], i[1][3]], i[2], i[3], i[4], i[5]]
-                    union_edgeList.append(newEdge)
-    
-                if existsAlready1 == 0 and existsAlready2 == 0:
-                    newEdge = [[ID1, i[0][1], i[0][2], i[0][3]], [ID2, i[1][1], i[1][2], i[1][3]], i[2], i[3], i[4], i[5]]
-                    union_edgeList.append(newEdge)
-            else:
-                # Because there can be trinagle and closed loops because of street Network
-                newEdge = [[existingID1, i[0][1], i[0][2], i[0][3]], [existingID2, i[1][1], i[1][2], i[1][3]], i[2], i[3], i[4], i[5]]
-                union_edgeList.append(newEdge)
-                              
+    # Could be speeded up by ony comparing sections to the right!
+    for segA in segmentsA:
+        slopeA = float(segA[1][1] - segA[0][1]) / float(segA[1][0]- segA[0][0]) # (Y1 - Y2) / X2-X1
+        cA = segA[0][1] - slopeA*segA[0][0]
         
-        # ------------------------------------
-        # Reset Nodes. Get new ID 
-        # ------------------------------------      
-        copyNodes = []        
-        for i in nodes:
-            newID = global_lookUpTable[i[0]][0]
-            copyNodes.append([newID, i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10]])
-        
-        # -----------------
-        # Change lookup table
-        # -----------------
-        for i in copyNodes:
-            exists = 0
-            for node in union_nodes:
-                if i[1] == node[1] and i[2] == node[2]: # Already exists
-                    flowInUnion = node[8]
-                    exists = 1
-                    idNode = node[0]
-                    break
+        startSegmentA = segA[0][0]
+        endSegmentA = segA[1][0]
 
-            # Select one with higher flow
-            if exists == 1:
-                currentFlow = i[8]
-
-                # Only replace if flow is larger --> Replace
-                if flowInUnion < currentFlow:
-                    for g in global_lookUpTable:
-                        if global_lookUpTable[g][0] == i[0]:
-                            global_lookUpTable[g][0] = idNode
-                            break
-                        
-        # ------------------------------------
-        # Reset IDs in StreetNetwork
-        # ------------------------------------  
-        for i in streetNetwork:
-            connections = {} 
-            newIDIndex = global_lookUpTable[i][0]
+        for segB in segmentsB:
+            slopeB = float(segB[1][1] - segB[0][1]) / float(segB[1][0]- segB[0][0]) # (Y1 - Y2) / X2-X1
             
-            for entry in streetNetwork[i]:
-                newID = global_lookUpTable[entry][0]
-                connections[newID] = streetNetwork[i][entry]
+            if slopeB == 0 and slopeA == 0:  # Both segments are zero (probably linear interpolation stuff)
+                break
             
-            # Test if already in common network
-            isInCommon = 0
-            try: 
-                _ = union_streetNetwork[newIDIndex]
-                isInCommon = 1
-            except:
-                isInCommon = 0
-   
-            if isInCommon == 1:
-                existingEntries = union_streetNetwork[newIDIndex]
-
-                for entry in connections:
-                    existingEntries[entry] = connections[entry]     # Append new connections
-                union_streetNetwork[newIDIndex] = existingEntries
-            else:
-                union_streetNetwork[newIDIndex] = connections    # Correctet entry
-                
-        # ------------------------------------
-        # Reset WWTPs. Get new ID 
-        # ------------------------------------      
-        for i in WWTPs:
-            newID = global_lookUpTable[i[0]][0]  
-            i[0] = newID
-        
-        # Copy to global
-        for i in WWTPs:
-            union_WWTPs.append(i)
-                      
-        # ------------------------------------
-        # Reset aggregated Nodes. Get new ID 
-        # ------------------------------------      
-        for i in aggregatetPoints:
-            newID = global_lookUpTable[i[0]][0]
-            i[0] = newID
-
-        # Copy to global
-        for i in aggregatetPoints:
-            exists = 0
-            for node in union_aggregatetPoints:
-                if i[1] == node[1] and i[2] == node[2]: # Already exists
-                    exists = 1
-                    break
-
-            # Select one with higher flow
-            if exists == 1:
-                #arcpy.AddMessage("EXIST")
-                #arcpy.pn("ds")
-                print("error zu")
-            else:
-                union_aggregatetPoints.append(i)
+            cB = segB[0][1] - slopeB*segB[0][0]
             
-        # ------------------------------------
-        # Reset Pumps. Get new ID 
-        # ------------------------------------      
-        for i in pumps:
-            newID = global_lookUpTable[i[0]][0]
-            i[0] = newID
+            # Do comparison
+            intersection = float(cA - cB)/float(slopeB - slopeA)                #  slopeA *x + cA = slopeB *x + cB --> ausformulieren 
+            startSegmentB = segB[0][0]
+            endSegmentB = segB[1][0]
+            
+            # Get Length of segments
+            if intersection < endSegmentA and intersection >= startSegmentA and intersection <= endSegmentB and intersection >= startSegmentB:   # If crossing within segments
+                intersections.append(intersection)
+                    
+    if len(intersections) == 0:
+        print("No Intersections")
+    return intersections
+
+
+def getSustainabilityPoint(lineA):
+    '''
+    costs --> position i[2]
+    '''
+    lowestPntValue = 99999999999999
+    for i in lineA:
+        totCostsPerPE = i[1]
+        if totCostsPerPE < lowestPntValue: # iterate costs
+            lowestPntValue = i[1]
+            lowestCR= i[0]
+    return lowestCR
+
+def getLockInPoint(sumCentralCurve, sumDistributedCurve, SustainabilityPoint):
+    pnts = []
     
-        # Copy to global
-        for i in pumps:
-            union_pumps.append(i)
-              
-        # ------------------------------------
-        # Reset Sewer Current. Get new ID 
-        # ------------------------------------
-        copySewerCurrent = []
-        for i in sewers_Current:
-            newID = global_lookUpTable[i][0]
-            copySewerCurrent.append(newID)
-        sewers_Current = copySewerCurrent 
+    # if central is larger than decentral
     
-        # Copy to global
-        for i in sewers_Current:
-            union_sewers_Current.append(i)
-                
-        # ------------------------------------
-        # Reset Sewer. Get new ID 
-        # ------------------------------------
-        newSeweres = {}
-        for i in sewers:
-            newIDIndex = global_lookUpTable[i][0]
-     
-            if sewers[i][0] == ():
-                newSeweres[newIDIndex] = ((), sewers[i][1])
-            else:
-                otherID = global_lookUpTable[sewers[i][0]][0]
-                newSeweres[newIDIndex] = (otherID, sewers[i][1])
-                
-        # Copy to global
-        for i in newSeweres:
-            union_sewers[i] = newSeweres[i]
+    # Problem that in deep range it might be possible because that we find lock-in points
+    # Therfore only if lock-in higher CR than SustainabilityPoint
+    
+    for f, b in zip(sumCentralCurve, sumDistributedCurve):
+        costCentral = f[1]
+        costDistributed = b[1]
+        lockInPnt = f[0]
+        
+        if costCentral > costDistributed:
+            if SustainabilityPoint < lockInPnt:
+                pnts.append(lockInPnt)
+                break
+    return pnts
+    
+    
+def createNormXValues(incrementStep, lenthToRound):
+    '''
+    This function creates the norm values
+    '''
+    lenthToRound = 3
+    
+    incrementStepInPercent = incrementStep/float(100) #conert to percent
+    xNormEntries =  []
+    
+    cnt = incrementStepInPercent
+    while cnt <= 1.000001:
+        xNormEntries.append(round(cnt,lenthToRound))
+        cnt += incrementStepInPercent
+
+    return xNormEntries
+
+def linearInterpolation(xNormEntries, valueList):
+    
+    '''
+    This function linearly interpolates
+
+    '''
+    newValues = []
+    #arcpy.AddMessage("ZULU " + str(valueList))
+    
+    # ITerat Norm Values
+    for XValue in xNormEntries:
+        belowPnt, abovePnt = [],[]
+        
+        identical = False
+        for i in valueList:
+            if i[0] == XValue: # no linear interpolation needed
+                newValues.append([XValue, i[1], i[2]]) # assing costs
+                identical = True
+                print("IDENTCIAL: " + str(XValue))
+                break
             
-        # ------------------------------------
-        # Buildings
-        # ------------------------------------
-        for i in buildings:
-            union_buildings.append(i)
-            
-        # ------------------------------------
-        # Build Points
-        # ------------------------------------
-        for i in buildPoints:
-            union_buildPoints.append(i)
-
-        # ------------------------------------
-        # Reset Nodes. Get new ID 
-        # ------------------------------------         
-
-        # Copy to global
-        for i in copyNodes:       
-            idNode = "None"
-            # IN case already exists because ArcGIS buildling aggregation might be different (border effects)
-            exists = 0
-            for node in union_nodes:
-                if i[1] == node[1] and i[2] == node[2]: # Already exists
-                    flowInUnion = node[8]
-                    exists = 1
-                    idNode = node[0]
-                    #arcpy.AddMessage("IDENTICAL: " + str(idNode))
-                    #arcpy.AddMessage("ORD X: " + str(node[1]))
-                    #arcpy.AddMessage("ORD Y: " + str(node[2]))
-                    #arcpy.AddMessage("ORD _X: " + str(i[1]))
-                    #arcpy.AddMessage("ORD _Y: " + str(i[2]))
-                    #arcpy.AddMessage(i[0]) 
-                    #arcpy.AddMessage(node[0]) 
-                    #arcpy.AddMessage("-----------") $               
-                    break
-
-            # Select one with higher flow
-            if exists == 1:
-                #arcpy.AddMessage("REPLACE: " + str(i[0]) + "  by " + str(idNode))
-                currentFlow = i[8]
+        if identical == True:
+            continue
+        
+        # Get closest above
+        for i in valueList:
+            if i[0] < XValue:
+                belowPnt = i
                 
-                # Only replace if flow is larger --> Replace
-                if flowInUnion < currentFlow:
-                    # Change in union_nodes
-                    for e in union_nodes:
-                        if e[0] == idNode:
-                            e[8] = currentFlow
-                            break
-                else:  
-                    
-                    # Update edgeList
-                    for g in union_edgeList:
-                        if g[0][0] == i[0]:
-                            g[0][0] = idNode
-                            break
-                    
-                    for g in union_edgeList:
-                        if g[1][0] == i[0]:
-                            g[1][0] = idNode
-                            break
-                    
-                    # Update WWTP
-                    for wwtp in union_WWTPs:
-                        if wwtp[0] == i[0]:
-                            wwtp[0] = idNode
-
-                    # Update Aggreagted Nodes
-                    for aggr in union_aggregatetPoints:
-                        if aggr[0] == i[0]:
-                            aggr[0] = idNode
-                            
-                    # Pumps
-                    copy_union_sewers = {}
-                    
-                    # Sewer
-                    for s in union_sewers:  
-                        replaceIndex = 0
-                        entry = union_sewers[s]
-                        
-                        if s == i[0]:
-                            replaceIndex = 1
-                        
-                        if entry[0] == i[0]:
-                            entry = (node[0], entry[1])
-
-                        if replaceIndex == 1:       
-                            copy_union_sewers[node[0]] = entry
-                        else:
-                            copy_union_sewers[s] = entry
-
-                    union_sewers = dict(copy_union_sewers)
-                    # Update StreetNetwork
-                    copy_union_streetNetwork = {}
-                    for s in union_streetNetwork:
-                        replaceIndex = 0
-                        EntrCopy = {}
-                        entry = union_streetNetwork[s]          # Connection from similar node
-
-                        if s == i[0]:
-                            replaceIndex = 1
-                            entryII = union_streetNetwork[idNode]   # Connection from similar node
-                        
-                        for e in entry:
-                            if e == i[0]:
-                                                                            #arcpy.AddMessage("IF REALLY NEEDED DOWN AS WELL NEEDED")
-                                EntrCopy[node[0]] = entry[e]
-                            else:
-                                EntrCopy[e] = entry[e]
-                        
-                        if replaceIndex == 1:
-
-                            # Merge the two connections of the identical point
-                            for connect in entryII:
-                                if connect == i[0]:
-                                    EntrCopy[node[0]] = entryII[connect]        #arcpy.AddMessage("IF REALLY NEEDED DOWN AS WELL NEEDED")
-                                else:
-                                    EntrCopy[connect] = entryII[connect]    # Add all connectiosn to first Node   
-                            copy_union_streetNetwork[node[0]] = EntrCopy
-                            
-                        else:
-                            copy_union_streetNetwork[s] = EntrCopy
-                    union_streetNetwork = dict(copy_union_streetNetwork)
-            else:
-                union_nodes.append(i)
-                
-        '''try: # FIND ID
-            for e in global_lookUpTable:
-                if global_lookUpTable[e][0] == 8799: 
-                    newEntry = e
-                    break
-            arcpy.AddMessage(" ")
-            arcpy.AddMessage(" FIND ID 8799: " + str(newEntry)) # 4276 --> 100316; 4727 --> 100317 236 --> 100236
-        except:
-                _ = 0
+        # above point
+        for i in valueList:
+            if i[0] > XValue:
+                abovePnt = i
+                break # as closest above is found
+        
+        # if no below pnt found, assing closest above
+        if belowPnt == []:
+            # convert first pnt above to below
+            newValues.append([XValue, abovePnt[1], abovePnt[2]]) # assing costs
+            continue
+        
+        # if no above pnt found, assing closest below node
+        if abovePnt == []:
+            newValues.append([XValue, belowPnt[1], belowPnt[2]]) # assing costs
+            break 
+        
+        # Linearly Interpolate Costs
+        slope_LinearInterpolate = float(belowPnt[2] - abovePnt[2]) / float(belowPnt[0]- abovePnt[0]) # (Y1 - Y2) / X2-X1
+        cA = belowPnt[2] - slope_LinearInterpolate*belowPnt[0]
+        
+        newXValue = slope_LinearInterpolate * XValue + cA # Insert normValue into Equation
+        
+        '''# Linearly Interpolate OST DEnsity
+        slope_OSTDEN = float(belowPnt[1] - abovePnt[1]) / float(belowPnt[0]- abovePnt[0]) # (Y1 - Y2) / X2-X1
+        cA = belowPnt[1] - slope_OSTDEN*belowPnt[0] # OST Density
+        
+        # Insert normValue into Equation
+        newXValue = slope_LinearInterpolate * XValue + cA
         '''
-        
-    flowIfSameCheck(union_WWTPs, union_aggregatetPoints)        # Check flow
+        newValues.append([XValue, abovePnt[1], newXValue])
     
-    return union_edgeList, union_streetNetwork, union_WWTPs, union_nodes, union_aggregatetPoints, union_pumps, union_sewers_Current, union_sewers, union_buildings, union_InParameter, union_buildPoints
+    return newValues
+
+
+
+# Plotting
+def plotAndStoreAsPNG(outPNGPath, costMatrixWithSummedCostCurves):
+    arcpy.AddMessage("Plot out Diagram")
+    #outPNGPath = 'Q:/Abteilungsprojekte/Eng/SWWData/Eggimann_Sven/06-Papers/03 - Third Paper - Full cost analysis/02-Figures/testFIg2.jpg'
     
-
-
-
-
-
-
-
-
-
-# ----------------------------------------------
-# Calculate terrain ruggedness
-# http://download.osgeo.org/qgis/doc/reference-docs/Terrain_Ruggedness_Index.pdf
-
-'''
-Given a DEM.
-
-Compute s = Focal sum (over 3 x 3 square neighborhoods) of [DEM].
-
-Compute DEM2 = [DEM]*[DEM].
-
-Compute t = Focal sum (over 3 x 3 square neighborhoods) of [DEM2].
-
-Compute r2 = [t] + 9*[DEM2] - 2*[DEM]*[s].
-
-Return r = Sqrt([r2]).
-
-or
-
-# Sum squared height difference in Queens Neigbourhood and take root.
-
-# The border values are not used.
-'''
-# ----------------------------------------------
-def terrainRuggednessIndex(rasterPoints, rasterSize):
-    totAnz, squaredQueenSums, cnt = len(rasterPoints), 0, 0
+    # Draw the curves# ------------
+    #import numpy as np
+    import matplotlib.pyplot as plt
+    #from pylab import *
+    import pylab
+    #import matplotlib.ticker as ticker
+    #from matplotlib.legend_handler import HandlerLine2D
+    #from matplotlib.font_manager import FontProperties
+    #from xlwt.Style import border_line_map
+        
+    #plotCentralCostData = []
+    x, y = [], []
+    x1, y1 = [], []
+    x2, y2 = [], []
     
-    for i in rasterPoints:
-        sumHDifference, QueenNodes = 0, []    # Squared Sum of h difference
+    x3, y3 = [], []
+    x4, y4 = [], []
+    
+    for i in costMatrixWithSummedCostCurves:
+        plot_WWTP = i[1]
+        plot_sewers = i[2]
+        plot_SummedCentral = i[5] 
+        plot_SummedDistributed = i[6]
+        plot_summedTotal = i[7]
         
-        # Get Queen Raster Points
-        xleft = i[1] + rasterSize
-        xright = i[1] - rasterSize
-        ytop =  i[2] + rasterSize
-        ybottom = i[2] - rasterSize
+    for i in plot_SummedCentral:
+        x.append(i[0])                  # density
+        y.append(i[1])                  # Z weighted
+    
+    for i in plot_SummedDistributed:
+        x1.append(i[0])                  # density
+        y1.append(i[1])                  # Z weighted
+    
+    for i in plot_summedTotal:
+        x2.append(i[0])                  # density
+        y2.append(i[1])                  # Z weighted
         
-        # Search Queen Neighbours
-        for f in rasterPoints:
-            if f[1] <= xleft and f[1] >= xright and f[2] <= ytop and f[2] >= ybottom:
-                QueenNodes.append(f)
+    for i in plot_sewers:
+        x3.append(i[0])                  # density
+        y3.append(i[1])                  # Z weighted
+        
+    for i in plot_WWTP:
+        x4.append(i[0])                  # density
+        y4.append(i[1])                  # Z weighted
+        
+    #area = [20]
+    plt.figure(facecolor="white")       # Remove grey background
+        
+    plt.plot(x, y, linestyle='-',  markersize=3, linewidth='1.5', color="blue", label="Summed Centralized")
+    plt.plot(x1, y1, linestyle='-', markersize=3, linewidth='1.5', color="green", label="Summed Distributed")
+    plt.plot(x2, y2, linestyle='-', linewidth='1',  markersize=3, color="red", label="Summed Total")
+    plt.plot(x3, y3, linestyle='-', linewidth='1', marker= "x", markersize=3, color="darkblue", label="Transport Central (sewer)")
+    plt.plot(x4, y4, linestyle='-', linewidth='1', marker= "x", markersize=3, color="grey", label="Treatment Central (WWTP)")
+    
+    # Data Series
+    ax = plt.subplot(111)
+        
+    ax.spines['right'].set_visible(False)       # Remove frame line right
+    ax.spines['top'].set_visible(False)         # Remove frame line bottom
+        
+    ax.xaxis.set_tick_params(width = 1.5)       # Size of ticks
+    ax.yaxis.set_tick_params(width = 1.5)       # Size of ticks
+        
+    ax.tick_params(axis='y', direction='out')   # Ticks outwards
+    ax.tick_params(axis='x', direction='out')   # Ticks outwards
+    
+    ax.xaxis.set_ticks_position('bottom')       # Only tiks on bottom
+    ax.yaxis.set_ticks_position('left')         # Only ticks on left
+        
+    # Get intervall ticks
+    #interval = 0.2
+    #nrOfInterval = 1
+    #cnt = 0
+    labelPosition = [0.2, 0.4, 0.6, 0.8, 1.0]
+    newLabels = [0.2, 0.4, 0.6, 0.8, 1.0]
+        
+    ax.set_xticks(labelPosition, minor=False)
+    ax.set_xticklabels(newLabels, minor=False, visible=True, size=8, name='arial')
+    
+    newLabelsY = [100,200,300,400,500,600,700,800,900,1000]
+    ax.set_yticklabels(newLabelsY, size=10, name='arial')
+    
+    pylab.xlim([0,1])
+    pylab.ylim(0)
+    
+    plt.legend(loc=2, frameon=False, fontsize=10)
+    
+    plt.xlabel('Connection rate', name='arial', weight='bold', fontsize=8)
+    plt.ylabel('Annuities [$/PE/Yearr]', name='arial', weight='bold', fontsize=8)
+    
+    #plt.show()
+    plt.savefig(outPNGPath)
+    
+    return
+
+    
+def plotBarSustainability(outPNGPath, sustainabilityPoints):
+    
+    # Example boxplot code
+    import sys
+    import os
+    import numpy as np
+    from matplotlib import *
+    import matplotlib.pyplot as plt
+    from pylab import *
+    import pylab
+    import matplotlib.ticker as ticker
+    from matplotlib.legend_handler import HandlerLine2D
+    from matplotlib.font_manager import FontProperties
+    from xlwt.Style import border_line_map
+    from matplotlib.lines import lineStyles
+    from operator import add  
+    
+    ## numpy is used for creating fake data
+    import matplotlib as mpl 
+    import matplotlib.pyplot as plt 
+    
+    
+    
+    #sustainabilityPoints = [0.2, 0.65, 0.7, 0.72, 0.43, 0.4, 0.76, 0.67, 0.6, 0.61]
+    
+    ## combine these different collections into a list    
+    data_to_plot = [sustainabilityPoints] #, scheduled, unscheduled]
+    
+    plt.figure(facecolor="white")       # Remove grey background
+    
+    # Create a figure instance
+    fig = plt.figure(1, figsize=(9, 6))
+    
+    # Create an axes instance
+    ax = fig.add_subplot(111)
+    
+    ax.spines['right'].set_visible(False)       # Remove frame line right
+    ax.spines['top'].set_visible(False)         # Remove frame line bottom
+    
+    ax.xaxis.set_tick_params(width = 1.5)       # Size of ticks
+    ax.yaxis.set_tick_params(width = 1.5)       # Size of ticks
+    
+    ax.tick_params(axis='y', direction='out')   # Ticks outwards
+    ax.tick_params(axis='x', direction='out')   # Ticks outwards
+    
+    ax.xaxis.set_ticks_position('bottom')       # Only tiks on bottom
+    ax.yaxis.set_ticks_position('left')         # Only ticks on left
+    
+    # Create the boxplot
+    bp = ax.boxplot(data_to_plot, sym='o', flierprops = dict(color='grey', markerfacecolor='grey', markersize = 0), boxprops = dict(linewidth=1, color='black'))
+    
+    # color
+    ## to get fill color
+    bp = ax.boxplot(data_to_plot, patch_artist=True) 
+    
+    
+    ## Custom x-axis labels
+    ax.set_xticklabels(["Sustainability CR"]) #, "Scheduled", "Unscheduled"])
+    
+    labelPositionY = [0, 0.2, 0.4, 0.6, 0.80, 1.0]
+    newLabelsY = [0, 0.2, 0.4, 0.6, 0.80, 1.0]
+    
+    ax.set_yticks(labelPositionY, minor=False)
+    ax.set_yticklabels(newLabelsY, minor=False, visible=True, size='small')
+    
+    
+    #y = np.array([100, 200, 400, 600, 800, 1000, 1200])
+    #plt.yticks(np.arange(y.min(), y.max(), 200))
+    ## change outline color, fill color and linewidth of the boxes
+    
+    ## change color and linewidth of the whiskers
+    for whisker in bp['whiskers']:  # Striche linie
+        whisker.set(color='grey', linewidth=2)
+    
+    for cap in bp['caps']:  # Oberer Querbalken
+        cap.set(color='grey', linewidth=2)
+    
+    ## change color and linewidth of the caps
+    #for cap in bp['caps']:
+    #    cap.set(color='grey', linewidth=2)
+    
+    ## change color and linewidth of the medians
+    for median in bp['medians']:
+        median.set(color='black', linewidth=3)
+    
+    ## change the style of fliers and their fill
+    for flier in bp['fliers']:
+        flier.set(marker='o', color='black', alpha=0.5)
+        
+    for box in bp['boxes']:
+        box.set(color='green', linewidth=1, edgecolor = "none")     # change outline color
+        box.set(facecolor = 'tan' )                                 # change fill color
+        
+    #pylab.ylim([0,1300])  # real values
+    pylab.ylim([0,1])  # real values
+    #plt.show()  
+    
+    plt.savefig(outPNGPath)
+    plt.close()
+    return
+
+def getCheapestStartingNode(listWithResults):
+    cheapest = 99999999900
+    for resultSNIP in listWithResults:
+        resultPerCR = resultSNIP[3]
+        lastEntry = len(resultPerCR)-1
+        totCost = resultPerCR[lastEntry][2]
+        if totCost < cheapest:
+            cheapest = totCost
+            cheapestStartnode = resultSNIP[0]
+            cheapestStartX = resultSNIP[1]
+            cheapestStartY = resultSNIP[2]
+            chapestRun = resultSNIP
+            arcpy.AddMessage("CHEAPESTRSTARNODE: " + str(cheapestStartnode))
+            
+    return cheapest,cheapestStartnode, cheapestStartX, cheapestStartY, chapestRun
+
+
+def crossingHillTest(rasterSize, rasterPoints, pStart, pEnd, hillValleyHeight):
+    """
+    Checks if on the way between two points a hill is crossed. It checks wheter i goes up more than the hight criteria.
+
+    Input Arguments: 
+    rasterSize           --    Raster size
+    rasterPoints         --    Raster points
+    pStart, pEnd         --    ID of starting and ending node
+    hillValleyHeight     --    Criteria [m] of a hill or valley
+
+    Output Arguments:
+    crossHillorValley    --    Criteria whether hill or valley is crossed or not. (0: No Hill is crossed, 1: Hill is crossed)
+    """
+    crossHillorValley, allLarger, allSmaller = False, True, True
+    pntsOnLine = getPntsOnLine(rasterSize, rasterPoints, pStart[0], pStart[1], pEnd[0], pEnd[1]) 
+
+    # Iterate pnts on line and compare heights if a hill or a valley is crossed 
+    #arcpy.AddMessage("pStart: " + str(pStart))
+    diffMinus, diffPlus = 0,0
+    cnt = 0
+    #downLine, upLine = False, False
+    
+    #if pStart[3] - pEnd[3] > 0:
+    #    downLine = True
+    #else:
+    #    upLine = True
+
+    
+    for i in pntsOnLine:
+        #arcpy.AddMessage("I: " + str(i))
+        # test if all are larger
+        currHeight = i[3]
+
+        if currHeight > pStart[2] and allLarger == True:
+            allLarger = True
+        else:
+            allLarger = False
+        
+        # test if all are smaller
+        if currHeight < pStart[2] and allSmaller == True:
+            allSmaller = True
+        else:
+            allSmaller = False
+
+
+        if cnt == 1:
+            diffH = currHeight - heightbefore
+            
+            #if downLine == True:  # Downwards
                 
-                # All Queen Neighbour found but don't use border nodes
-                if len(QueenNodes) == 9:
-                    for qNode in QueenNodes:
-                        hdiff = (i[3] - qNode[3])**2       # calc squared Sum
-                        sumHDifference += hdiff            # sum heights
-                        
-                    summDiffRoot = sumHDifference**0.5     # Take root
-                    squaredQueenSums += summDiffRoot
-                    print("NR left: " + str(totAnz - cnt))
-                    cnt += 1
-                    break                                   
+            if diffH > 0:
+                diffPlus = 0
+                
+            if diffH < 0:
+                #diffPlus += diffH
+                diffPlus += abs(diffH) # Change absolute
+                
+            if diffH >= hillValleyHeight:
+                crossHillorValley = True
+                break
+                
+            if diffPlus >= hillValleyHeight:
+                crossHillorValley = True
+                #arcpy.AddMessage("FON: " + str(diffPlus))
+                #arcpy.AddMessage("pStart: " + str(pStart))
+                #arcpy.AddMessage("pEnd: " + str(pEnd))
+                #prnt(":..")
+                break
+                
+            heightbefore  = currHeight
+        else:
+            cnt = 1
+            heightbefore  = currHeight
+        
+        '''  
 
-    # Get average squaredQueenSums over whole DEM
-    #TRI = sum(squaredQueenSums) / float(len(squaredQueenSums))
-    TRI = squaredQueenSums / cnt
-    return TRI
+        # Test if valley is crossed
+        if i[3] < (pStart[2] - hillValleyHeight) and allSmaller == 0:
+            crossHillorValley = True
+            arcpy.AddMessage("ALL: " + str(allSmaller))
+            prnt(":.")
+            break
+        
+        # Test if hill is crossed
+        if i[3] > (pStart[2] + hillValleyHeight) and allLarger == 0:
+            crossHillorValley = True
+            arcpy.AddMessage("ALLB: " + str(allLarger))
+            prnt(":.")
+            break
+        '''
+    if allLarger == True:
+        # If all pnts are larger, then we ignore valley inbetween (local maxima get ignored)
+        crossHillorValley = False
+        
+    #arcpy.AddMessage("Return: " + str(crossHillorValley))
+    return crossHillorValley 
+
+def getPntsOnLine(rasterSize, rasterPoints, startX, startY, endX, endY):
+    """
+    This function gets all rasterpoints on a line between two points.
+
+    Input Arguments: 
+    rasterSize         --    Size of raster cell
+    rasterPoints       --    List with raster points
+    startX, startY     --    Start Coordinate 
+    endX, endY         --    End Coordinate
+ 
+    Output Arguments:
+    pnts               --    updated nodes
+    """
+    pnts, pointListBoundingBox = [], []                     # pnts on the line, Points with all points in bounding box
+    uncertaintyRange, vertLine = 0.5, 0                     # How close a point needs to be to the line in order it is considered to be on the line,  If vertical line (if y == 0)
+    bandWidth = uncertaintyRange * rasterSize               # define uncertainty range
+    quadrant = checkQuadrant(startX, startY, endX, endY)    # get nodes in bounding box
+ 
+    if quadrant == 1:
+        for i in rasterPoints:
+            if i[1] >= startX - bandWidth and i[1] <= endX + bandWidth and i[2] >= startY - bandWidth and i[2] <= endY + bandWidth:
+                pointListBoundingBox.append(i)
+
+    if quadrant == 2:
+        for i in rasterPoints:
+            if i[1] >= startX - bandWidth and i[1] <= endX + bandWidth and i[2] <= startY + bandWidth and i[2] >= endY - bandWidth:
+                pointListBoundingBox.append(i)
+
+    if quadrant == 3:
+        for i in rasterPoints:
+            if i[1] <= startX + bandWidth and i[1] >= endX - bandWidth and i[2] <= startY + bandWidth and i[2] >= endY - bandWidth:
+                pointListBoundingBox.append(i)
+
+    if quadrant == 4:
+        for i in rasterPoints:
+            if i[1] <= startX + bandWidth and i[1] >= endX - bandWidth and i[2] >= startY - bandWidth and i[2] <= endY + bandWidth:
+                pointListBoundingBox.append(i)
+
+    try:
+        m = (float(endY) - float(startY)) / (float(endX) - float(startX))    # calculate m of a linear equation
+        b = float(endY) - (m * float(endX))                                  # calculate b of a linear equation
+        
+    except:
+        # if starting and ending are identical
+        if startX == endX and startY == endY:
+            arcpy.AddMessage( "ERROR: Identical Point and thus no hill cross Check")
+            return pnts
+        else:
+            arcpy.AddMessage( "INFO: Straight line")
+            vertLine, xVertical = 1, startX
+    
+    #Check points in pointListBoundingBox and select only those on the line
+    for i in pointListBoundingBox:
+        x, y = i[1], i[2]
+        
+        if vertLine == 0:
+            if m != 0:
+                
+                if m > -1 and m < 1:        # If slope between 1 and -1, measure Y-Deviation
+                    calcY = x * m + b
+                    
+                    if abs(calcY - y) <= bandWidth:
+                        pnts.append(i)
+                else:                       # measure x-Deviation
+                    calcX = (y - b)/m       # Calculated X if were on line
+                    
+                    if abs(calcX - x) <= bandWidth:
+                        pnts.append(i) 
+            else:
+                    # If a horizontal line (m == 0)
+                if b + bandWidth > y and y < b - bandWidth: # If far away enough from line, don't add
+                    pnts.append(i)
+        
+        else:       # Straight vertical line
+            if x < xVertical + bandWidth and x > xVertical - bandWidth:
+                pnts.append(i)
+
+    return pnts

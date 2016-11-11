@@ -36,12 +36,15 @@
 # ======================================================================================
 
 # Path to Python SNIP Files
-pythonScriptPath = "C://Users/eggimasv/URBANDENSITY/P4/" 
-          
+pythonScriptPath = "Q://.../.../FolderContainingPythonFiles/"             # Path to Python SNIP Files
+pythonScriptPath = "Q://Abteilungsprojekte/Eng/SWWData/Eggimann_Sven/09-GIS-Python/0-PythonFiles/"             
 
 # Path with stored data files (.txt files)
-txtFileInputPath = "C://_SCRAP_FOLDERSTRUCTURE//430900//" #414100
-#txtFileInputPath = "C://_SCRAP_FOLDERSTRUCTURE//414100//"
+txtFileInputPath = "Q://.../.../FolderContainingdataFiles/"  
+txtFileInputPath = "Q://Abteilungsprojekte/Eng/SWWData/Eggimann_Sven/07-Fallbeispiele/02_GIS_BERN/26_Meiringen/_SSS/SNP/"  
+#txtFileInputPath = "Q://Abteilungsprojekte/Eng/SWWData/Eggimann_Sven/07-Fallbeispiele/02_GIS_BERN/34_LangnauiE/902Langnau im Emmental/_SNIP_NEU
+
+txtFileInputPath = "Q://Abteilungsprojekte//eng//SWWData//Eggimann_Sven//07-Fallbeispiele//02_GIS_BERN//11_mittleresEmmental//"
 
 OnlyExecuteMerge = 0
 
@@ -55,8 +58,8 @@ sys.path.append(pythonPath)
 
 # Calculation Parameter
 calculateTRI, calculateNN, calculateVRM = 0, 0, 0   # Calculate topographic factors
-randomPontGeneration = 0                           # Used for random point generation
-writeInArcGIS = 1                                   # Create ArcGIS Output
+randomPontGeneration = 1                           # Used for random point generation
+writeInArcGIS = 0                                   # Create ArcGIS Output
 drawHouseConnections = 0                            # House Connections are drawn in ArcGIS, 0: House Connections are not drawn in ArcGIS
 clusterCalculation = 0                              # Calculation on EMPA: 1
 FAST = 0                                            # Used for FAST Calculation
@@ -100,7 +103,7 @@ if clusterCalculation == 0:
     else:
         print("JETZT SINDWA HIER")
         # Path python scripts
-        pathWriteoutScript = "C://Users/eggimasv/URBANDENSITY/P4/writeResults.py"             # Script to write out results                                               # Path with textfiles
+        pathWriteoutScript = "Q://Abteilungsprojekte/Eng/SWWData/Eggimann_Sven/09-GIS-Python/0-PythonFiles/writeResults.py"             # Script to write out results                                               # Path with textfiles
 
         # FAST Input Values
         #txtFASTInputPath = "Q://Abteilungsprojekte/Eng/SWWData/Eggimann_Sven/13-R/fast_InputValues.txt"  # Path to folder with .txt files 
@@ -148,7 +151,7 @@ if randomPontGeneration == 0:
     
 # Imports
 from SNIP_functions import *
-#from SNIP_astar import *
+from SNIP_astar import *
 from SNIP_costs import *
 from SNIP_statistics import *
 print("all imports complete")
@@ -231,11 +234,81 @@ if clusterCalculation == 1:
         rasterPointsNew.append(i)
     rasterPoints = rasterPointsNew
 
-'''outListFolder = txtFileInputPath + "_SNIP_SCRAPPY" + "/"     
+outListFolder = txtFileInputPath + "_SNIP_SCRAPPY" + "/"     
 if not os.path.exists(outListFolder):
     os.mkdir(outListFolder)
-'''
-outListFolder = resultPath
+
+
+# Correct flow of Annina which was entered!
+for pnt in forSNIP:
+    nrOfPerson = pnt[8]/EW_Q_Annina
+    pnt[8] = nrOfPerson * EW_Q
+    
+# Crect flow of Annina
+for pnt in aggregatetPoints:
+    nrOfPerson = pnt[8]/EW_Q_Annina
+    pnt[8] = nrOfPerson * EW_Q
+
+# Crect flow of Annina
+for pnt in buildPoints:
+    nrOfPerson = pnt[4]/EW_Q_Annina
+    pnt[4] = nrOfPerson * EW_Q
+
+# Calculate Topographic Indices
+if calculateTRI == 1:
+    TRI = terrainRuggednessIndex(rasterPoints, rasterSize)
+    print("...TERRAIN ROUGHNESS INDEX: " + str(TRI))
+
+if calculateNN == 1:
+    ANN = averageNearestNeighborDistance(buildings)
+    print("..ANN: " + str(ANN))
+
+if calculateVRM == 1:
+    #VRMINPUT_Path = "Q:/Abteilungsprojekte/eng/SWWData/Eggimann_Sven/_scrap/OUT/vrm_points.shp"
+    VRM = readVRMPnts(VRMINPUT_Path)
+    print("...VRM" + str(VRM))
+
+
+# -------------------------
+
+# -------------------------
+
+# Used for eFAST
+if FAST == 1:
+    print("enter FAST")
+    FASTrun = Input_VARIABLE                            # FAST-Run
+    FASTValues = readInFastValues(txtFASTInputPath)     # Read in eFAST-INPUT Matrix
+
+    # Parameters for eFAST
+    maxTD = FASTValues[FASTrun][0]          
+    minSlope = FASTValues[FASTrun][1]         
+    f_street =  FASTValues[FASTrun][2]        
+    f_topo = FASTValues[FASTrun][3]
+    f_merge = FASTValues[FASTrun][4]
+    EW_Q = FASTValues[FASTrun][5]
+    discountYearsSewers = FASTValues[FASTrun][6]
+    wwtpLifespan = FASTValues[FASTrun][7]
+    fc_SewerCost = FASTValues[FASTrun][8]
+    fc_wwtpCapex = FASTValues[FASTrun][9]   
+    fc_wwtpOpex = FASTValues[FASTrun][10]   
+    interestRate = FASTValues[FASTrun][11]   
+    resonableCostsPerEW = FASTValues[FASTrun][12]  
+    interestRate = float(interestRate) / 100    # Reformulate real interest rate
+    
+    # Correct flow of Annina which was entered!
+    for pnt in forSNIP:
+        nrOfPerson = pnt[8]/EW_Q_Annina
+        pnt[8] = nrOfPerson * EW_Q
+        
+    # Crect flow of Annina
+    for pnt in aggregatetPoints:
+        nrOfPerson = pnt[8]/EW_Q_Annina
+        pnt[8] = nrOfPerson * EW_Q
+    
+    # Crect flow of Annina
+    for pnt in buildPoints:
+        nrOfPerson = pnt[4]/EW_Q_Annina
+        pnt[4] = nrOfPerson * EW_Q
 
 # Select specific starting node
 if startNodeCheck == 1: 
@@ -296,7 +369,7 @@ if clusterCalculation == 0 and randomPontGeneration == 0:
     writeTotxt(resultPath, "result_" + str(Input_VARIABLE) + "_streetVertices", streetVertices)
     writeTotxt(resultPath, "result_" + str(Input_VARIABLE) + "_buildPoints", buildPoints)
     writeTotxt(resultPath, "result_" + str(Input_VARIABLE) + "_buildings", buildings)
-    writeTotxt(resultPath, "result_" + str(Input_VARIABLE) + "_rasterPoints", rasterPoints[0]) # Ev rasterPoints[0]
+    writeTotxt(resultPath, "result_" + str(Input_VARIABLE) + "_rasterPoints", rasterPoints)
     writeTotxt(resultPath, "result_" + str(Input_VARIABLE) + "_aggregatedNodes", aggregatetPoints)
     writeTotxt(resultPath, "result_" + str(Input_VARIABLE) + "_startnode", [startnode, startX, startY])  # Write startnode
     writeTotxt(resultPath, "result_" + str(Input_VARIABLE) + "_edgesID", edgeList)  # Write startnode
@@ -360,4 +433,4 @@ print("----------------------------")
 # Create ArcGIS Output
 if writeInArcGIS == 1:
     import arcpy
-    execfile(pythonScriptPath + "writeResults.py")
+    execfile("Q://Abteilungsprojekte/Eng/SWWData/Eggimann_Sven/09-GIS-Python/0-PythonFiles/writeResults.py")

@@ -17,25 +17,24 @@ def collectDataAllRuns(path):
     resultFolder = []
     
     # Get the folders
-    mainfolderPaths = []
     folderList = os.listdir(path) 
-    folderList.sort()
-    for folder in folderList: #[0:2]: #[1:4]: #[2:27]:
-        mainfolderPaths.append(path + "\\" + folder + "\\" + "ResultSNIP" + "\\")
-    
-    print ("Anzahl Folder: " + str(len(mainfolderPaths)))
-    
-    # Reat our txt files
-    for i in mainfolderPaths: 
+    for folder in folderList[:-1]:
+        resultFolder.append(path[:-1] + folder)
 
-        path = str(i) + "plot_MATRIX_RUNS.txt" #costMatrixWithSummedCostCurves.txt"
-        #path = str(i) + "plot_MATRIX_RUNS.txt"
-        
-        txtFileList = readLines(path)
-        z = txtFileList[0]
-        result = list(eval(z))
-        resultFolder.append(result)
-        
+    return resultFolder
+
+def collectDataAllRunsBefore(path):
+    '''
+    Collects 
+    '''
+    # List with all results from all the calculations
+    resultFolder = []
+    
+    # Get the folders
+    folderList = os.listdir(path) 
+    for folder in folderList:
+        resultFolder.append(path[:-1] + folder)
+
     return resultFolder
 
 def removeShapeFile(path):
@@ -102,29 +101,44 @@ search_radius = 100                         # [m] Search radius for Near Analysi
 
 
 afterGME = True                            # False: Before GME Ececution to write out GME commands.
+BetweenSteps = False
 
 # ----------------------------------------------------------------------
-# Line to exectute command file with GME (full patz to .txt is necssary)
 # ----------------------------------------------------------------------
-subp.call(str(pathToSEGME) + r' -c run(in=\"C:\_SCRAP_FOLDERSTRUCTURE\GMEcommands.txt\");');
+# Line to exectute command file with GME (full patz to .txt is necssary)
+# PROVIDe LINK TO FOLDER!
+# ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+if BetweenSteps == True:
+    subp.call(str(pathToSEGME) + r' -c run(in=\"C:\_SCRAP_FOLDERSTRUCTURE\GMEcommands.txt\");');
 
 # ------------------------------------------------------------------------------------------
 
-ListWithWWTPCatchments = ["Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\02_GIS_BERN\\304_Kallnach\\304Kallnach", "Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\02_GIS_BERN\\304_Kallnach\\304Kallnach1"]
-ListWithWWTPCatchments = ["C:\\_SCRAP_FOLDERSTRUCTURE\\430900"]
+#ListWithWWTPCatchments = ["Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\02_GIS_BERN\\304_Kallnach\\304Kallnach", "Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\02_GIS_BERN\\304_Kallnach\\304Kallnach1"]
+#ListWithWWTPCatchments = ["C:\\_SCRAP_FOLDERSTRUCTURE\\430900"]
 
+if afterGME == False:
+    ListWithWWTPCatchments = collectDataAllRunsBefore(pathForGMECommands)
+else:
+    ListWithWWTPCatchments = collectDataAllRuns(pathForGMECommands)
+
+print("PAths: " + str(ListWithWWTPCatchments))
 
 nameUSUfile = "USU_raw"   # Name of USU after first intersection
 
 # Read in street network
 for pathCatchement in ListWithWWTPCatchments:
+    print("Iteration, pathCatchement : " + str(pathCatchement))
     
     pathStreetUSU = str(pathCatchement) + "\\" + "street_simplified_split.shp"
     pathRailwayUSU = str(pathCatchement) + "\\" + "railwayNetwork.shp"
     pathSettlementArea = str(pathCatchement) + "\\" + "settlementArea.shp"
     pathBuildings = str(pathCatchement) + "\\" + "buildings_inhabited.shp"
-        
+    
+    pathstreetRailMerge = pathCatchement + "\\" + "streetRailMerge.shp"
+      
     if afterGME == False:
+        print("------------------------------------------------")
         print("Path WWTP Catchements: " + str(pathCatchement))
         
 
@@ -142,8 +156,8 @@ for pathCatchement in ListWithWWTPCatchments:
         arcpy.env.workspace = pathCatchement
         arcpy.Merge_management([pathStreetUSU, pathRailwayUSU], pathCatchement + "/" + "streetRailMerge.shp")
     
-        pathstreetRailMerge = pathCatchement + "\\" + "streetRailMerge.shp"
-        pathUSU = pathCatchement + "\\" + "USU.shp"
+        
+        #pathUSU = pathCatchement + "\\" + "USU.shp"
         print("Finishing merging Street and Railway Network" + str(pathstreetRailMerge))
         
         #Assign same coordinate system
@@ -183,7 +197,7 @@ for pathCatchement in ListWithWWTPCatchments:
         writeToTxtGMEcommand(pathForGMECommands, inputCodeBackSlashForTxt) 
         
     if afterGME == True:
-    
+        print("Only Execute after GME Was executed seperately")
         # ------------------
         # Execute with .txt file
         # ------------------
@@ -211,26 +225,38 @@ for pathCatchement in ListWithWWTPCatchments:
         # ----------------------------
         #subp.call(r'C:\Users\eggimasv\AppData\Local\Apps\2.0\BN23RV48.G12\9DDGL0P7.2AJ\segm..tion_c23e290fb11c064b_0001.0000_143886b27f0a8c90\SEGME.exe -c run(in=\"' + str(pathForGMECommands) + "GMEcommands.txt" + '\");');
         
-        
-        
+        # ----------------------
+        # 3 Convert Multipart to Singlepart
+        # ----------------------
+        nameUSUfileSinglePart = "USU_rawSinglePart"   # Name of USU after first intersection
+        in_table = str(pathCatchement) + "\\" + nameUSUfile + ".shp"
+        outTableSingleFeatureUSU =  str(pathCatchement) + "\\" + nameUSUfileSinglePart + ".shp"
+            
+        arcpy.MultipartToSinglepart_management(in_table, outTableSingleFeatureUSU)  # Convert Multi to Singlepart
+
         # -------------
         # 4. Add AREA field and calculate area
         # -------------
-        in_table = str(pathCatchement) + "\\" + nameUSUfile + ".shp"
         field_name = "USU_AREA"
         field_type = "FLOAT"
     
-        arcpy.AddField_management(in_table, field_name, "FLOAT")
+        arcpy.AddField_management(outTableSingleFeatureUSU, field_name, "FLOAT")
         expression1 = "{0}".format("!SHAPE.area@SQUAREMETERS!")        
-        arcpy.CalculateField_management(in_table, field_name, expression1, "PYTHON", )
+        arcpy.CalculateField_management(outTableSingleFeatureUSU, field_name, expression1, "PYTHON", )
     
+    
+        # -------------
+        # 4a. Remove dublicates
+        # -------------
+        arcpy.DeleteIdentical_management(outTableSingleFeatureUSU, ["Shape"]) #, "PERIMETER"])
+
         #------------------------------------------------------------------------------------------------------------------------
         # 5. Delete all which are smaller than minimumUSUArea
         #------------------------------------------------------------------------------------------------------------------------
-        arcpy.env.workspace = in_table  # Set environment settings
+        arcpy.env.workspace = outTableSingleFeatureUSU  # Set environment settings
          
         # Set local variables
-        inFeatures = in_table
+        inFeatures = outTableSingleFeatureUSU
         outFeatures =  str(pathCatchement) + "\\" + "USU_cleaned" + ".shp"
         tempLayer = "smallUSU"
         expression = "USU_AREA" + " < " + str(minimumUSUArea)
@@ -240,7 +266,7 @@ for pathCatchement in ListWithWWTPCatchments:
      
         # Execute MakeFeatureLayer
         arcpy.MakeFeatureLayer_management(outFeatures, tempLayer)
-     
+    
         # Execute SelectLayerByAttribute to determine which features to delete
         arcpy.SelectLayerByAttribute_management(tempLayer, "NEW_SELECTION",  expression)
      
@@ -248,6 +274,8 @@ for pathCatchement in ListWithWWTPCatchments:
         if int(arcpy.GetCount_management(tempLayer).getOutput(0)) > 0:
             arcpy.DeleteFeatures_management(tempLayer)
         
+        # Delete Layer
+        arcpy.Delete_management(tempLayer)
         #------------------------------------------------------------------------------------------------------------------------
         # 6. Export only those USU with buildings on it and also export all single buildings outside settlement area
         #------------------------------------------------------------------------------------------------------------------------
@@ -278,7 +306,10 @@ for pathCatchement in ListWithWWTPCatchments:
             print('no features matched spatial and attribute criteria')
         else:
             arcpy.CopyFeatures_management(tempLayerSinglebuildings, outFeaturesSingleBuildings)
-    
+            
+        # Delete Layer
+        arcpy.Delete_management(tempLayer2)
+        arcpy.Delete_management(tempLayerSinglebuildings)
         # ----------
         # 7. Creat Temporary ID of USU
         # ------------
@@ -347,6 +378,8 @@ for pathCatchement in ListWithWWTPCatchments:
         expression1 = "{0}".format("!EINW_GEB!/ (!USU_AREA!/1000000)") # 1km2 has 1'000 000 m2
         arcpy.CalculateField_management(outFeatureJoinCentroids, field_name, expression1, "PYTHON", )
         
+        # Delete Layer
+        arcpy.Delete_management(layerName1)
         #------------------------------------------------------------------------------------------------------------------------
         # 12. Merge Single Buildings and USU
         #------------------------------------------------------------------------------------------------------------------------
@@ -401,6 +434,10 @@ for pathCatchement in ListWithWWTPCatchments:
         
         expression1 = "{0}".format("!EINW_GEB! * " + str(EW_Q)) # 1km2 has 1'000 000 m2
         arcpy.CalculateField_management(outFeatureSingleBuildingsAndUSU, field_name, expression1, "PYTHON", )
+    
+        
+        # Delete fields
+        arcpy.DeleteField_management(outFeatureSingleBuildingsAndUSU, ["Id", "ORIG_FID", "JOINID", "Rowid_", "FID_1", "V25OBJECTO", "V25OBJECTV", "MINDTM", "HEIGHT", "Z_Min", "Z_Max", "Inhabited", "Area_Foot", "Volume", "OBJECTART", "BFS_NUMMER", "BEZIRKSNUM", "KANTONSNUM", "NAME", "GEM_TEIL", "SHN", "ARA_Nr", "ARA_Name", "POPGem_06", "VolSumInha", "Pop_Build", "P4_DATA"])
     
         #------------------------------------------------------------------------------------------------------------------------
         # 12. Remove shapefiles which are not needed

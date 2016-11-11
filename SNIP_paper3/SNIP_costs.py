@@ -150,9 +150,51 @@ def getPipeDiameter(Q, slope, stricklerC):
             pipeDiameter = 10
             return pipeDiameter
     
+def costWWTP(flow, EWQuantity, lifeWwtps, interestRate, fc_wwtpOpex, fc_wwtpCapex):
+    """
+    This function calculates the costs of a wwtp.
     
+    Input Arguments: 
+    flow                    -    Amount of waste water to be treated [in m3]
+    EWQuantity              -    Factor to calculate population equivalent from amount of waste water.
+    lifeWwtps               -    Life span of treatment plant
+    interestRate            -    Real interest rate [%
+    fc_wwtpOpex             -    WWTP operation cost parameter
+    fc_wwtpCapex            -    WWTP replacement cost parameter
+        
+    Output Arguments:
+    totalAnnualCosts        -    Total annuities
+    """
+    #import arcpy
+    r = float(interestRate + 1.0)                                                                       # r of annuities formula
+    EW = float(flow) / float(EWQuantity)                                                                # [PE] Calculate flow in population equivalent (Convert liter in EW)
+    sensFactor_Operation = 1 + fc_wwtpOpex
+    sensFactor_Replacement = 1 + fc_wwtpCapex
+    
+    
+    # Capex - Annual Operation costs
+    replacementCostsPerEW =  13318 * EW**-0.209 * sensFactor_Replacement                                # Source: VSA
+    replacementCosts = replacementCostsPerEW * EW 
+    
+    annuitiesReplacementCosts = replacementCosts * ((interestRate * r**lifeWwtps)) / (r**lifeWwtps -1)  # Calculate annuities
 
+    # Opex - Annual Operation Costs
+    annaulOperationCostsPerEW = 340.82 * EW**-0.171 * sensFactor_Operation                              # Source VSA
+    totannaulOperationCosts = annaulOperationCostsPerEW * EW
+    totalAnnualCosts = annuitiesReplacementCosts + totannaulOperationCosts                              # Operation Costs & replacement costs
+    
+    
+    '''arcpy.AddMessage("replacementCostsPerEW: " + str(replacementCostsPerEW))
+    arcpy.AddMessage("EW_:                   "  + str(EW))
+    arcpy.AddMessage("annaulOperationCostsPerEW: " + str(annaulOperationCostsPerEW))
+    arcpy.AddMessage("replacementCostsPerEW:     " + str(replacementCostsPerEW))
 
+    arcpy.AddMessage("replacementCosts:      " + str(replacementCosts))
+    arcpy.AddMessage("totannaulOperationCosts:  " + str(totannaulOperationCosts))
+    arcpy.AddMessage("totalAnnualCosts:         " + str(totalAnnualCosts))
+    arcpy.AddMessage("----------- ")
+    '''
+    return totalAnnualCosts
 
 def calculateConnectionCosts(pipeCostI, totPumpCostI, pipeCostII, totPumpCostII, pipeCostIII, totPumpCostIII, WWTPcostsI, interestRate, lifeWwtps, lifeSewers): 
     """
@@ -397,178 +439,16 @@ def fromLocalCRgetDensity(localCR):
     return densityWholeAreaGlarus
 
 
-
-
-
-# -----------
-
-def getCostCentralTreatment(PE):
+def getCostCentralTreatment(PE, idleCapacityPercentage, totPeopleInCatchement, assumptionPE):
     ''' 
     cost curves from paper II. Returns in Dollars
     idleCapacityinPercent     -     How much idle capacity
     
     out:
-    annuity_CHFtotal     -    Annuity of total treatment plant in CHF based on Paper III
+    annuity_0Percent                        -    Annuitiy no idle capacity
+    annuity_IdleCapacity     -    Annuity depending on idle capacity 
     
-    '''    
-    # If smaller than 20 take cost curve from decentral treatments
-    if PE <= 20:
-        annuity_Dollar = getCostDistributedTreatment(PE)        
-               
-    if PE > 20: # If lager thant 20 PE take cost curve from VSA
-        annuity_Dollar = 410.05*pow(PE,-0.25) 
-
-    # Convert Dollar into CHF  1 $ = 1.43 CHF (PPP 2011)
-    annuity_CHF = 1.43 / float(1 * annuity_Dollar)
-    
-    annuity_CHFtotal = annuity_CHF * PE
-    
-    return annuity_CHFtotal
-
-# Replace costWWTP with III costcurves
-def costWWTP(flow, EWQuantity, lifeWwtps, interestRate, fc_wwtpOpex, fc_wwtpCapex):
-    """
-    This function calculates the costs of a wwtp.
-    
-    Input Arguments: 
-    flow                    -    Amount of waste water to be treated [in m3]
-    EWQuantity              -    Factor to calculate population equivalent from amount of waste water.
-    lifeWwtps               -    Life span of treatment plant
-    interestRate            -    Real interest rate [%
-    fc_wwtpOpex             -    WWTP operation cost parameter
-    fc_wwtpCapex            -    WWTP replacement cost parameter
-        
-    Output Arguments:
-    totalAnnualCosts        -    Total annuities
-    
-    """  
-    r = float(interestRate + 1.0)
-    PE = float(flow) / float(EWQuantity)
-      
-    # If smaller than 20 take cost curve from decentral treatments from Paper III (excuding density costs)
-    if PE <= 20:
-        annuity_Dollar = getCostDistributedTreatment(PE)        
-        annuity_CHF = 1.43 * annuity_Dollar                 # Convert Dollar into CHF  1 $ = 1.43 CHF (PPP 2011)
-               
-    if PE > 20: # If lager than 20 PE take cost curve from VSA  # TAKE COST CURVe from PAPER I (including Betrieb)
-        #annuity_Dollar = 410.05*pow(PE,-0.25)  # From paper III
-        
-        # Capex - Annual Operation costs [in CHF]
-        replacementCostsPerEW =  13318 * PE**-0.209                                # Source: VSA
-        replacementCosts = replacementCostsPerEW 
-        annuitiesReplacementCosts = replacementCosts * ((interestRate * r**lifeWwtps)) / (r**lifeWwtps -1)  # Calculate annuities
-    
-        # Opex - Annual Operation Costs [in CHF]
-        annaulOperationCostsPerEW = 340.82 * PE**-0.171                              # Source VSA
-        totannaulOperationCosts = annaulOperationCostsPerEW
-        annuity_CHF = annuitiesReplacementCosts + totannaulOperationCosts                              # Operation Costs & replacement costs
-        
-
-    
-    #annuity_CHF = 1.43 * annuity_Dollar
-    
-    annuity_CHFtotal = annuity_CHF * PE
-    
-    return annuity_CHFtotal
-
-
-def OLDcostWWTP(flow, EWQuantity, lifeWwtps, interestRate, fc_wwtpOpex, fc_wwtpCapex):
-    """
-    This function calculates the costs of a wwtp.
-    
-    Input Arguments: 
-    flow                    -    Amount of waste water to be treated [in m3]
-    EWQuantity              -    Factor to calculate population equivalent from amount of waste water.
-    lifeWwtps               -    Life span of treatment plant
-    interestRate            -    Real interest rate [%
-    fc_wwtpOpex             -    WWTP operation cost parameter
-    fc_wwtpCapex            -    WWTP replacement cost parameter
-        
-    Output Arguments:
-    totalAnnualCosts        -    Total annuities
-    """
-    r = float(interestRate + 1.0)                                                                       # r of annuities formula
-    EW = float(flow) / float(EWQuantity)                                                                # [PE] Calculate flow in population equivalent (Convert liter in EW)
-    sensFactor_Operation = 1 + fc_wwtpOpex
-    sensFactor_Replacement = 1 + fc_wwtpCapex
-    
-    
-    # Capex - Annual Operation costs
-    replacementCostsPerEW =  13318 * EW**-0.209 * sensFactor_Replacement                                # Source: VSA
-    replacementCosts = replacementCostsPerEW * EW 
-    
-    annuitiesReplacementCosts = replacementCosts * ((interestRate * r**lifeWwtps)) / (r**lifeWwtps -1)  # Calculate annuities
-
-    # Opex - Annual Operation Costs
-    annaulOperationCostsPerEW = 340.82 * EW**-0.171 * sensFactor_Operation                              # Source VSA
-    totannaulOperationCosts = annaulOperationCostsPerEW * EW
-    totalAnnualCosts = annuitiesReplacementCosts + totannaulOperationCosts                              # Operation Costs & replacement costs
-
-    return totalAnnualCosts
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def getCostCentralTreatment(PE):
-    ''' 
-    cost curves from paper II. Returns in Dollars
-    idleCapacityinPercent     -     How much idle capacity
-    
-    out:
-    annuity_CHFtotal     -    Annuity of total treatment plant in CHF based on Paper III
-    
-    '''    
-    # If smaller than 20 take cost curve from decentral treatments
-    if PE <= 20:
-        annuity_Dollar = getCostDistributedTreatment(PE)        
-               
-    if PE > 20: # If lager thant 20 PE take cost curve from VSA
-        annuity_Dollar = 410.05*pow(PE,-0.25) 
-
-    # Convert Dollar into CHF  1 $ = 1.43 CHF (PPP 2011)
-    annuity_CHF = 1.43 / float(1 * annuity_Dollar)
-    
-    annuity_CHFtotal = annuity_CHF * PE
-    
-    return annuity_CHFtotal
-
-def getCostDistributedTreatment(PE):
-    """
-    In Dollar from Paper III
-    
-    """
-    costDistrTreat = (416.83 / PE) + 66.06 + 52.98 * pow(math.e, -0.0609 * PE) + 3.38 + 42.64 * pow(math.e, -0.0515 * PE) + 51.92
-    return costDistrTreat # Cosr per PE
-
-
-
-
-
-
-
-'''def getCostCentralTreatment(PE, idleCapacityPercentage, totPeopleInCatchement, assumptionPE):
-    # 
-    #cost curves from paper II. Returns in Dollars
-    #idleCapacityinPercent     -     How much idle capacity
-    #
-    #out:
-    #annuity_0Percent                        -    Annuitiy no idle capacity
-    #nnuity_IdleCapacity     -    Annuity depending on idle capacity 
-    #
-    #
+    '''
     interestRate, lifeExpectancy = 0.02, 30                                     # percent, years
     totCostAnnuityCatchementWWTP = 410.05 * pow(totPeopleInCatchement,-0.25)    # Annuities, no idle capacity full catchement WWTP
     
@@ -612,13 +492,12 @@ def getCostDistributedTreatment(PE):
     return annuity_IdleCapacity
 
 def getCostDistributedTreatment(PE):
-    # 
-    #cost curves from paper II. Returns in Dollars
-    #
+    ''' 
+    cost curves from paper II. Returns in Dollars
+    '''
     
     # Cost curve Rachel
     
     costDistrTreat = (416.83 / PE) + 66.06 + 52.98 * pow(math.e, -0.0609 * PE) + 3.38 + 42.64 * pow(math.e, -0.0515 * PE) + 51.92
     
     return costDistrTreat # Cosr per PE
-'''

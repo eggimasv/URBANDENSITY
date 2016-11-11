@@ -22,6 +22,9 @@ rows = arcpy.da.SearchCursor(inputShapeWithWWTP, ["ARA_Nr"])    # Read WWTP numb
 # ------------------------
 SwisscordSys = arcpy.SpatialReference(21781) # EPSG:21781 ,CH1903 / LV03 # Swiss Coordinate System
 
+scrapcnt= 0
+
+
 for row in rows:
     
     # Create Folder
@@ -81,6 +84,12 @@ for row in rows:
     arcpy.DefineProjection_management(geb_CH, SwisscordSys)
     arcpy.DefineProjection_management(DEM_CH, SwisscordSys)
     arcpy.DefineProjection_management(settlement_clip, SwisscordSys)
-   
-    prnt("..")
+    
+    # Delete Layer Field
+    #arcpy.RemoveLayer(WWTPgeometry, "lyr")
+    arcpy.Delete_management("lyr")
+    
+    scrapcnt += 1
+    if scrapcnt == 2:
+        prnt("..")
     

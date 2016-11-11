@@ -36,7 +36,7 @@
 #sys.path.append("c:\\program files (x86)\\arcgis\\desktop10.2\\arcpy")
 import arcpy
 
-import os, sys               # General Imports
+import os, sys                      # General Imports
 import gc; gc.disable()             # Don't allow garbage collection
 from itertools import product
 
@@ -44,13 +44,9 @@ from itertools import product
 mainFolder = "Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\03-Glarus\\01-GIS_Data\\Glarus_communities"
 
 
-#mainFolder ="Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\02_GIS_BERN\\561_Adelboden"
-#mainFolder ="Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\02_GIS_BERN\\604_Bleiken"
-
-
 # Change after the insallation of the ArcToolBox
-pythonScriptPath = "Q://Abteilungsprojekte/Eng/SWWData/Eggimann_Sven/09-GIS-Python/0-PythonFiles/03-third_paper/"  # Path where SNIP Python files are stored
-#pythonScriptPath = "..../Folder_With_SNIP_Python_Files/"  # Path where SNIP Python files are stored
+pythonScriptPath = "C:/Users/eggimasv/URBANDENSITY/P4"  # Path where SNIP Python files are stored
+
 
 def rewritePath(inPath):
     ''' Replace Characters in string path to get correct path.'''
