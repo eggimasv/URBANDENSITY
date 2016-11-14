@@ -400,6 +400,9 @@ def fromLocalCRgetDensity(localCR):
 
 
 
+
+
+
 # -----------
 
 def getCostCentralTreatment(PE):
@@ -422,8 +425,9 @@ def getCostCentralTreatment(PE):
     annuity_CHF = 1.43 / float(1 * annuity_Dollar)
     
     annuity_CHFtotal = annuity_CHF * PE
-    
     return annuity_CHFtotal
+
+
 
 # Replace costWWTP with III costcurves
 def costWWTP(flow, EWQuantity, lifeWwtps, interestRate, fc_wwtpOpex, fc_wwtpCapex):
@@ -462,17 +466,12 @@ def costWWTP(flow, EWQuantity, lifeWwtps, interestRate, fc_wwtpOpex, fc_wwtpCape
         annaulOperationCostsPerEW = 340.82 * PE**-0.171                              # Source VSA
         totannaulOperationCosts = annaulOperationCostsPerEW
         annuity_CHF = annuitiesReplacementCosts + totannaulOperationCosts                              # Operation Costs & replacement costs
-        
-
-    
-    #annuity_CHF = 1.43 * annuity_Dollar
     
     annuity_CHFtotal = annuity_CHF * PE
-    
     return annuity_CHFtotal
 
 
-def OLDcostWWTP(flow, EWQuantity, lifeWwtps, interestRate, fc_wwtpOpex, fc_wwtpCapex):
+'''def OLDcostWWTP(flow, EWQuantity, lifeWwtps, interestRate, fc_wwtpOpex, fc_wwtpCapex):
     """
     This function calculates the costs of a wwtp.
     
@@ -506,31 +505,18 @@ def OLDcostWWTP(flow, EWQuantity, lifeWwtps, interestRate, fc_wwtpOpex, fc_wwtpC
 
     return totalAnnualCosts
 
+'''
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def getCostCentralTreatment(PE):
-    ''' 
+'''def getCostCentralTreatment(PE):
+    """
     cost curves from paper II. Returns in Dollars
     idleCapacityinPercent     -     How much idle capacity
     
     out:
     annuity_CHFtotal     -    Annuity of total treatment plant in CHF based on Paper III
     
-    '''    
+    """   
     # If smaller than 20 take cost curve from decentral treatments
     if PE <= 20:
         annuity_Dollar = getCostDistributedTreatment(PE)        
@@ -544,6 +530,7 @@ def getCostCentralTreatment(PE):
     annuity_CHFtotal = annuity_CHF * PE
     
     return annuity_CHFtotal
+    '''
 
 def getCostDistributedTreatment(PE):
     """

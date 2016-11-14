@@ -91,7 +91,7 @@ print("---------------------------")
 pathToSEGME = r'C:\Users\eggimasv\AppData\Local\Apps\2.0\BN23RV48.G12\9DDGL0P7.2AJ\segm..tion_c23e290fb11c064b_0001.0000_143886b27f0a8c90\SEGME.exe'
 
 pathForGMECommands = r'Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\02_GIS_BERN\\'
-pathForGMECommands = r'C:\\_SCRAP_FOLDERSTRUCTURE\\'
+pathForGMECommands = r'C:\\P4_CH\\'
 
 
 # Global Variables
@@ -110,7 +110,8 @@ BetweenSteps = False
 # ----------------------------------------------------------------------
 # ----------------------------------------------------------------------
 if BetweenSteps == True:
-    subp.call(str(pathToSEGME) + r' -c run(in=\"C:\_SCRAP_FOLDERSTRUCTURE\GMEcommands.txt\");');
+    #subp.call(str(pathToSEGME) + r' -c run(in=\"C:\_SCRAP_FOLDERSTRUCTURE\GMEcommands.txt\");');
+    subp.call(str(pathToSEGME) + r' -c run(in=\"C:\P4_CH\GMEcommands.txt\");');
 
 # ------------------------------------------------------------------------------------------
 
@@ -121,6 +122,20 @@ if afterGME == False:
     ListWithWWTPCatchments = collectDataAllRunsBefore(pathForGMECommands)
 else:
     ListWithWWTPCatchments = collectDataAllRuns(pathForGMECommands)
+    
+    '''
+    cnt = 0
+    for i in ListWithWWTPCatchments:
+        if i == "C:\\\\P4_CH\\359501" #300501":
+            print("POSITION IN LSIt: " + str(cnt)) #179  , [179:180]
+        
+        cnt += 1
+    '''
+
+# SCRAP
+ListWithWWTPCatchments = ListWithWWTPCatchments #[514:] #[252:] #[181:] #[179:180]
+print(ListWithWWTPCatchments)
+    
 
 print("PAths: " + str(ListWithWWTPCatchments))
 
@@ -276,6 +291,7 @@ for pathCatchement in ListWithWWTPCatchments:
         
         # Delete Layer
         arcpy.Delete_management(tempLayer)
+        
         #------------------------------------------------------------------------------------------------------------------------
         # 6. Export only those USU with buildings on it and also export all single buildings outside settlement area
         #------------------------------------------------------------------------------------------------------------------------
@@ -286,8 +302,8 @@ for pathCatchement in ListWithWWTPCatchments:
         arcpy.SelectLayerByLocation_management(tempLayer2, 'intersect', pathBuildings)
         
         # If features matched criteria write them to a new feature class
-        matchcount = int(arcpy.GetCount_management(tempLayer2)[0]) 
-        if matchcount == 0:
+        matchcountUSU = int(arcpy.GetCount_management(tempLayer2)[0]) 
+        if matchcountUSU == 0:
             print('no features matched spatial and attribute criteria')
         else:
             arcpy.CopyFeatures_management(tempLayer2, outFeatures3)
@@ -300,92 +316,117 @@ for pathCatchement in ListWithWWTPCatchments:
         arcpy.SelectLayerByLocation_management(tempLayerSinglebuildings, 'intersect', outFeatures)
         arcpy.SelectLayerByLocation_management(tempLayerSinglebuildings, None, None, "", "SWITCH_SELECTION")
         
-        matchcount = int(arcpy.GetCount_management(tempLayerSinglebuildings)[0]) 
+        matchcountBUILD = int(arcpy.GetCount_management(tempLayerSinglebuildings)[0]) 
             
-        if matchcount == 0:
-            print('no features matched spatial and attribute criteria')
+        if matchcountBUILD == 0:
+            print('There are no single buildlings')
         else:
             arcpy.CopyFeatures_management(tempLayerSinglebuildings, outFeaturesSingleBuildings)
             
         # Delete Layer
-        arcpy.Delete_management(tempLayer2)
-        arcpy.Delete_management(tempLayerSinglebuildings)
+        #arcpy.Delete_management(tempLayer2)
+        #arcpy.Delete_management(tempLayerSinglebuildings)
+        
         # ----------
         # 7. Creat Temporary ID of USU
         # ------------
-        field_name_USU_ID_tp = "JOINID"
-        field_type = "FLOAT"   
-        arcpy.AddField_management(outFeatures3, field_name_USU_ID_tp, "FLOAT") 
-    
-        # Loop through the rows in the attribute table
-        uniqueID = 0
-        cur = arcpy.UpdateCursor(outFeatures3)
-        for row in cur:
-            uniqueID += 1
-            row.setValue(field_name_USU_ID_tp, uniqueID)      # Assign value
-            cur.updateRow(row)                             # Apply the change
+        if matchcountUSU > 0: # IF there are USUs
+            print("There are USU")
+            field_name_USU_ID_tp = "JOINID"
+            field_type = "FLOAT"   
+            arcpy.AddField_management(outFeatures3, field_name_USU_ID_tp, "FLOAT") 
         
-        #------------------------------------------------------------------------------------------------------------------------
-        # 8. Spatial Intersect to add USU_ID on buildings
-        #------------------------------------------------------------------------------------------------------------------------
-        outFeatures4 = str(pathCatchement) + "\\" + "USU_buildings_sj_ID" + ".shp"
-        arcpy.Intersect_analysis([outFeatures3, pathBuildings], outFeatures4)
+            # Loop through the rows in the attribute table
+            uniqueID = 0
+            cur = arcpy.UpdateCursor(outFeatures3)
+            for row in cur:
+                uniqueID += 1
+                row.setValue(field_name_USU_ID_tp, uniqueID)      # Assign value
+                cur.updateRow(row)                             # Apply the change
         
-        #------------------------------------------------------------------------------------------------------------------------
-        # 9. Spatial Statistics of USU with tempory ID
-        #------------------------------------------------------------------------------------------------------------------------    
-        summaryTable = str(pathCatchement) + "\\" + "usu_summary_table"
-        statistics_fields = [["Einw_GEB", "SUM"]]
-        arcpy.Statistics_analysis(outFeatures4, summaryTable, statistics_fields, field_name_USU_ID_tp)
+            #------------------------------------------------------------------------------------------------------------------------
+            # 8. Spatial Intersect to add USU_ID on buildings
+            #------------------------------------------------------------------------------------------------------------------------
+            outFeatures4 = str(pathCatchement) + "\\" + "USU_buildings_sj_ID" + ".shp"
+            arcpy.Intersect_analysis([outFeatures3, pathBuildings], outFeatures4)
+            
+            #------------------------------------------------------------------------------------------------------------------------
+            # 9. Spatial Statistics of USU with tempory ID
+            #------------------------------------------------------------------------------------------------------------------------    
+            summaryTable = str(pathCatchement) + "\\" + "usu_summary_table"
+            statistics_fields = [["Einw_GEB", "SUM"]]
+            arcpy.Statistics_analysis(outFeatures4, summaryTable, statistics_fields, field_name_USU_ID_tp)
         
-        #------------------------------------------------------------------------------------------------------------------------
-        # 10. Create Centroid File of USU with ID
-        #------------------------------------------------------------------------------------------------------------------------
-        USU_Centroids = str(pathCatchement) + "\\" + "USU_centroids" + ".shp"
-        arcpy.FeatureToPoint_management(outFeatures3, USU_Centroids, "CENTROID")  
+            #------------------------------------------------------------------------------------------------------------------------
+            # 10. Create Centroid File of USU with ID
+            #------------------------------------------------------------------------------------------------------------------------
+            USU_Centroids = str(pathCatchement) + "\\" + "USU_centroids" + ".shp"
+            arcpy.FeatureToPoint_management(outFeatures3, USU_Centroids, "CENTROID")  
+        else: # If there are not USU
+            print("There are no USU")
+            USU_Centroids = str(pathCatchement) + "\\" + "USU_centroids" + ".shp"
+            arcpy.FeatureToPoint_management(tempLayerSinglebuildings, USU_Centroids, "CENTROID")  #13.11.2016
+            
+        # Delete Layer
+        arcpy.Delete_management(tempLayer2)
+        arcpy.Delete_management(tempLayerSinglebuildings)
         
         #------------------------------------------------------------------------------------------------------------------------
         # 11. Table joint of Centroid and Table statistics
         #-----------------------------------------------------------)-------------------------------------------------------------
-        layerName1 = "layerForTableJoin"
-        joinField = field_name_USU_ID_tp
-        joinTable = summaryTable + ".dbf"
-        outFeatureJoinCentroids = str(pathCatchement) + "\\" + "USU_centroids_join" + ".shp"
-        
-        arcpy.MakeFeatureLayer_management(USU_Centroids, layerName1)
-        arcpy.AddJoin_management(layerName1, joinField, joinTable, joinField, "KEEP_ALL")
-    
-        # Copy the layer to a new permanent feature class
-        arcpy.env.qualifiedFieldNames = False
-        arcpy.CopyFeatures_management(layerName1, outFeatureJoinCentroids)
-        
-        arcpy.DeleteField_management(outFeatureJoinCentroids, field_name_USU_ID_tp + "_1") #Delte old USU_ID
+        if matchcountUSU > 0: # IF there are USUs
+            print("USU yeas 2")
+            layerName1 = "layerForTableJoin"
+            joinField = field_name_USU_ID_tp
+            joinTable = summaryTable + ".dbf"
+            outFeatureJoinCentroids = str(pathCatchement) + "\\" + "USU_centroids_join" + ".shp"
             
-        # Transfer SUM_EINWO_GEB into EINW_GEB
-        field_name = "EINW_GEB"
-        field_type = "FLOAT"
-        arcpy.AddField_management(outFeatureJoinCentroids, field_name, "FLOAT")
-        expression1 = "{0}".format("!SUM_EINW_G!")        
-        arcpy.CalculateField_management(outFeatureJoinCentroids, field_name, expression1, "PYTHON", )
-        arcpy.DeleteField_management(outFeatureJoinCentroids, "SUM_EINW_G") #Delte old USU_ID
+            arcpy.MakeFeatureLayer_management(USU_Centroids, layerName1)
+            arcpy.AddJoin_management(layerName1, joinField, joinTable, joinField, "KEEP_ALL")
         
+            # Copy the layer to a new permanent feature class
+            arcpy.env.qualifiedFieldNames = False
+            arcpy.CopyFeatures_management(layerName1, outFeatureJoinCentroids)
+            
+            arcpy.DeleteField_management(outFeatureJoinCentroids, field_name_USU_ID_tp + "_1") #Delte old USU_ID
+            
+            # Transfer SUM_EINWO_GEB into EINW_GEB
+            field_name = "EINW_GEB"
+            field_type = "FLOAT"
+            arcpy.AddField_management(outFeatureJoinCentroids, field_name, "FLOAT")
+            expression1 = "{0}".format("!SUM_EINW_G!")        
+            arcpy.CalculateField_management(outFeatureJoinCentroids, field_name, expression1, "PYTHON", )
+            arcpy.DeleteField_management(outFeatureJoinCentroids, "SUM_EINW_G") #Delte old USU_ID
+            
+            
+            # Calculate USU Population Density by adding field
+            field_name = "USU_PD" # USU Population Density
+            field_type = "FLOAT"
         
-        # Calculate USU Population Density by adding field
-        field_name = "USU_PD" # USU Population Density
-        field_type = "FLOAT"
-    
-        arcpy.AddField_management(outFeatureJoinCentroids, field_name, "FLOAT")
-        expression1 = "{0}".format("!EINW_GEB!/ (!USU_AREA!/1000000)") # 1km2 has 1'000 000 m2
-        arcpy.CalculateField_management(outFeatureJoinCentroids, field_name, expression1, "PYTHON", )
-        
-        # Delete Layer
-        arcpy.Delete_management(layerName1)
-        #------------------------------------------------------------------------------------------------------------------------
-        # 12. Merge Single Buildings and USU
-        #------------------------------------------------------------------------------------------------------------------------
-        outFeatureSingleBuildingsAndUSU = str(pathCatchement) + "\\" + "USU_USUandSingleBuildings" + ".shp"
-        arcpy.Merge_management([outFeatureJoinCentroids, outFeaturesSingleBuildings], outFeatureSingleBuildingsAndUSU)
-        
+            arcpy.AddField_management(outFeatureJoinCentroids, field_name, "FLOAT")
+            expression1 = "{0}".format("!EINW_GEB!/ (!USU_AREA!/1000000)") # 1km2 has 1'000 000 m2
+            arcpy.CalculateField_management(outFeatureJoinCentroids, field_name, expression1, "PYTHON", )
+            
+            # Delete Layer
+            arcpy.Delete_management(layerName1)
+            #------------------------------------------------------------------------------------------------------------------------
+            # 12. Merge Single Buildings and USU
+            #------------------------------------------------------------------------------------------------------------------------
+            outFeatureSingleBuildingsAndUSU = str(pathCatchement) + "\\" + "USU_USUandSingleBuildings" + ".shp"
+            if matchcountBUILD > 0:
+                print("there are buildlings")
+                arcpy.Merge_management([outFeatureJoinCentroids, outFeaturesSingleBuildings], outFeatureSingleBuildingsAndUSU)
+            else:
+                print("there reno single builldings")
+                arcpy.Merge_management([outFeatureJoinCentroids], outFeatureSingleBuildingsAndUSU) # not merge as only USUS
+                
+                arcpy.AddField_management(outFeatureSingleBuildingsAndUSU, "POINT_X", "FLOAT") 
+                arcpy.AddField_management(outFeatureSingleBuildingsAndUSU, "POINT_Y", "FLOAT")
+                arcpy.AddField_management(outFeatureSingleBuildingsAndUSU, "Q", "FLOAT") 
+                
+        else:
+            outFeatureSingleBuildingsAndUSU = str(pathCatchement) + "\\" + "USU_USUandSingleBuildings" + ".shp"
+            arcpy.Merge_management([outFeaturesSingleBuildings], outFeatureSingleBuildingsAndUSU)
         #------------------------------------------------------------------------------------------------------------------------
         # 13. Generate definitiv USU_ID Field and assign USU_ID
         #------------------------------------------------------------------------------------------------------------------------
@@ -444,11 +485,25 @@ for pathCatchement in ListWithWWTPCatchments:
         #------------------------------------------------------------------------------------------------------------------------
         
         removeShapeFile(USU_Centroids)
-        removeShapeFile(outFeaturesSingleBuildings)
+        
+        try:
+            removeShapeFile(outFeaturesSingleBuildings)
+        except:
+            print("no Singel buildlings to deltete")
         removeShapeFile(outFeatures)
-        removeShapeFile(outFeatures3)
-        removeShapeFile(outFeatures4)
-        removeShapeFile(outFeatureJoinCentroids)
+        
+        try:
+            removeShapeFile(outFeatures3)
+        except:
+            print "no USU File to Delete"
+        try:
+            removeShapeFile(outFeatures4)
+        except:
+            print"no outFeatures4            "
+        try:
+            removeShapeFile(outFeatureJoinCentroids)
+        except:
+            print"not outFeatureJoinCentroids"
         #os.remove(summaryTable)
         
     

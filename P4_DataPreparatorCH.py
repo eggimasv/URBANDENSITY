@@ -6,24 +6,20 @@ import os
 
 
 # Inputs
-pathToGenerateFolderStructure = "C:\_SCRAP_FOLDERSTRUCTURE"                                                                         # Path to generate folder structure
+pathToGenerateFolderStructure = "C:\P4_CH"            
 inputShapeCHPaths = "Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\04-finalCH"  # Path with WWTP Catchements
 inputShapeWithWWTP = inputShapeCHPaths + "\\" + "WWTP_catchements2014_ALLDATA.shp"  # Path with WWTP Catchements
 
 
-
-
+# Create Main Folder
 os.mkdir(pathToGenerateFolderStructure)                         # Create Main Folder
 rows = arcpy.da.SearchCursor(inputShapeWithWWTP, ["ARA_Nr"])    # Read WWTP numbers
-
 
 # ------------------------
 # Assign Coordinages of CH shapefiles
 # ------------------------
 SwisscordSys = arcpy.SpatialReference(21781) # EPSG:21781 ,CH1903 / LV03 # Swiss Coordinate System
-
 scrapcnt= 0
-
 
 for row in rows:
     
@@ -86,10 +82,4 @@ for row in rows:
     arcpy.DefineProjection_management(settlement_clip, SwisscordSys)
     
     # Delete Layer Field
-    #arcpy.RemoveLayer(WWTPgeometry, "lyr")
     arcpy.Delete_management("lyr")
-    
-    scrapcnt += 1
-    if scrapcnt == 2:
-        prnt("..")
-    

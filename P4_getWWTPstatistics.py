@@ -172,59 +172,27 @@ def readInGeoDictionary(pathInFile):
         #cnt+=1
 
     return catchements
-    
-    
-    '''inputfile = open(pathInFile, 'r')   # Set Path to existing .txt-File with R results
-    lineArray = inputfile.readlines()   # Read in single result lines from txtfile into List
-    
-    print"lineArray"
-    print(lineArray[0])
-    print(lineArray[1])
-    
-    lines = []
-    
-    for i in lineArray:
-        lines.append(i)
-        
-    print("_-------")
-    print(lines[0][0])
-    print(lines[1])
-    #print(lineArray)
-    prnt("..")
-    
-    
-    lines = []                          # Create empty list to fill in whole txt File with results
-    position = 0                        
-    while position < len(lineArray):    # Iterate through list with line-results by position
-        entry = lineArray[position]     # Get line at position
-        lines.append(entry)             # Append line at position to empty List
-        position += 1                   # For the loop
-    inputfile.close()                   # Close result .txt file 
-    '''
-    return lines
-
 
 
 # --------------------
 # Input Paramters
 # --------------------
-pathResultFolder = r'C:\\_SCRAP_FOLDERSTRUCTURE\\'
+kantonGeoBFS        = [[1, 'Zurich'], [2, 'Bern'], [3, 'Luzern'], [4, 'Uri'], [5, 'Schwyz'], [6, 'Obwalden'], [7, 'Nidwalden'], [8, 'Glarus'], [9, 'Zug'], [10, 'Freiburg'], [11, 'Solothurn'], [12, 'Basel-Stadt'], [13, 'Basel-Landschaft'], [14, 'Schaffhausen'], [15, 'Appenzell\xa0Ausserrhoden'], [16, 'Appenzell\xa0Innerrhoden'], [17, 'St.\xa0Gallen'], [18, 'Graub\xfcnden'], [19, 'Aargau'], [20, 'Thurgau'], [21, 'Tessin'], [22, 'Waadt'], [23, 'Wallis'], [24, 'Neuenburg'], [25, 'Genf'], [26, 'Jura']]
+pathResultFolder    = r'C:\\_SCRAP_FOLDERSTRUCTURE\\'  # Is the same as in datPerparatorCHF the main folder  
 pathToGeoDictionary = r'Q:\\Abteilungsprojekte\eng\SWWData\Eggimann_Sven\07-Fallbeispiele\04-finalCH\dictionaryGEO.txt'
 
-smallWWTP = 10 # Small PE
-EW_Q = 0.162    # NEEDS OT BE THE SAME! 
+
+EW_Q = 0.162    # NEEDS OT BE THE SAME asin all other files
 
 
-# CREABETON 4 - 30
-
-sizeSmallWWTP = 30        # Size in PE of Small treatment package plant    
+sizeSmallWWTP = 30        # Size in PE of Small treatment package plant        # CREABETON 4 - 30
 sizeMiddleWWTP = 100      # Size in PE of Middle treatment package plant
 
 
-#dictionaryWithAllCatchmentINFOs = # Import from ArcGIS
-geoDictionary = readInGeoDictionary(pathToGeoDictionary)
-print(geoDictionary)
-prnt("geoDictionary")
+
+
+# Import Geo of all Catchements ([BFS_NUMMER, KANTONSNUM, NAME, ARA_Nr, ARA_Name])
+catchmentDictionary = readInGeoDictionary(pathToGeoDictionary)
 
 # Read out all Folders
 ListWithWWTPCatchments = collectDataAllRuns(pathResultFolder)
@@ -232,9 +200,11 @@ ListWithWWTPCatchments = collectDataAllRuns(pathResultFolder)
 
 pathResults = "GIS_PYTHON\\"
 
+# STistics per Canton [ARA_NR, kantonNr, gemeindeNr, Z, Z_weighted, percentageSmallWWTP, percentageMiddle, percentageLarge]
+statisticsPerCanton = []        
 
 # Iterate Folder
-for pathCatchement in ListWithWWTPCatchments: # Remove the 1
+for pathCatchement in ListWithWWTPCatchments: 
     print("--------------------")
     print("Path Catchement : " + str(pathCatchement))
     
@@ -262,7 +232,13 @@ for pathCatchement in ListWithWWTPCatchments: # Remove the 1
         
         # ----------------------
         # CREATE WWPT STAITISCS
-        # ----------------------
+        # ----------------------  
+        # Read statistics from Statistics file
+        statistics = readStatistics(statistics)
+        
+        Z = statistics[3]
+        Z_weighted = statistics[4]
+        
         WWTPS = readInWWTPs(wwtpFile)
         #print(WWTPS)
         
@@ -271,28 +247,27 @@ for pathCatchement in ListWithWWTPCatchments: # Remove the 1
      
         print(" ")
         print("-----------------")
-        print("WWTP Distribution")
+        print("WWTP Distribution for Ara NR: " + str(ARA_NR))
         print("-----------------")
-        print("percentageSmallWWTP: " + str(percentageSmallWWTP))
-        print("percentageMiddle:    " + str(percentageMiddle))
-        print("percentageLarge:     " + str(percentageLarge))
-        print("Test Total:          " + str(percentageSmallWWTP + percentageMiddle + percentageLarge))
+        print("Z:                            " + str(Z))
+        print("Z_weighted:                   " + str(Z_weighted)) 
+        print("percentageSmallWWTP:          " + str(percentageSmallWWTP))
+        print("percentageMiddle:             " + str(percentageMiddle))
+        print("percentageLarge:              " + str(percentageLarge))
+        print("Test Total:                   " + str(percentageSmallWWTP + percentageMiddle + percentageLarge))
         print("-----------------")
         
-        
-        # Read statistics from Statistics file
-        statistics = readStatistics(statistics)
-        
-        Z = statistics[3]
-        Z_weighted = statistics[4]
-        
-
         # Find Geography in Dictionary
-        
-        #ARA_NR
-        
-        
-        # Add to List
-        
+        for i in catchmentDictionary:
+            
+            if i[3] == ARA_NR:
+                print("Alle INfos : " + str(i))
+                kantonNr = i[1]
+                gemeindeNr = i[0]
+                
+                statCanton = [ARA_NR, kantonNr, gemeindeNr, Z, Z_weighted, percentageSmallWWTP, percentageMiddle, percentageLarge]
+                
+                # Append Statistics to canton
+                statisticsPerCanton.append(statCanton)
     except:
         print"The File was not found"
