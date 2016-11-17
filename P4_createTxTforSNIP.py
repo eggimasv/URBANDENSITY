@@ -11,6 +11,16 @@ def rewritePath(inPath):
         inPath = inPath.replace(c[0], c[1])
     return inPath
 
+def removeShapeFile(path):
+    os.remove(path)
+    os.remove(path[:-3] + "dbf")
+    os.remove(path[:-3] + "prj")
+    os.remove(path[:-3] + "sbn")
+    os.remove(path[:-3] + "cpg")
+    os.remove(path[:-3] + "sbx")
+    os.remove(path[:-3] + "shp.xml")
+    os.remove(path[:-3] + "shx")
+    return
 
 def collectDataAllRunsBefore(path):
     '''
@@ -40,15 +50,55 @@ toolboxes = ["Data Management Tools.tbx"]
 arcpy.env.overwriteOutput = True
 
 # ArcGIS System Arguments
-pathFoldersWithCatchements = r'C:\\P4_CH\\'
+pathFoldersWithCatchements = r'C:\\P4_CH_NEU\\'
 
 
-ListWithWWTPCatchments = collectDataAllRunsBefore(pathFoldersWithCatchements)   # Iterate Folders to get patsh
 
-for txtFileInputPath in ListWithWWTPCatchments:
-    
+ListWithWWTPCatchments = collectDataAllRunsBefore(pathFoldersWithCatchements)   
+
+for txtFileInputPath in ListWithWWTPCatchments[298:]:# --> bis 298 ok.
     print("txtFileInputPath: " + str(txtFileInputPath))
     print("--------------------------------------------")
+        
+    # This whole Loop is only necessary if there are loops in the street network (and the copy file needs to be exectued first in main folder)
+    Loop = False
+    if Loop == True:
+
+        streetSimplifiedDeleteLoopPathLOOP = txtFileInputPath + "\\street_simplified_splitLOOP.shp"
+        streetRailMergePathLOOP = txtFileInputPath + "\\streetRailMergeLOOP.shp"
+        
+        streetSimplifiedDeleteLoopPath = txtFileInputPath + "\\street_simplified_split.shp"
+        streetRailMergeDeleteLoopPath = txtFileInputPath + "\\streetRailMerge.shp"
+        
+        print"streetSimplifiedDeleteLoopPathLOOP: " + str(streetSimplifiedDeleteLoopPathLOOP)
+        print("streetRailMergePathLOOP:  "  + str(streetRailMergePathLOOP))
+        
+        # Execute MakeFeatureLayer
+        arcpy.MakeFeatureLayer_management(streetSimplifiedDeleteLoopPathLOOP, "tempLayer")
+        arcpy.MakeFeatureLayer_management(streetRailMergePathLOOP, "tempLayer1")
+         
+        # Execute SelectLayerByAttribute to determine which features to delete
+        expression = '"END_X" = "START_X" and "START_Y"= "END_Y"'
+        
+        arcpy.SelectLayerByAttribute_management("tempLayer", "NEW_SELECTION", expression)
+        if int(arcpy.GetCount_management("tempLayer").getOutput(0)) > 0:
+            print("Detected Loop")
+            arcpy.DeleteFeatures_management("tempLayer")
+            arcpy.CopyFeatures_management("tempLayer", streetSimplifiedDeleteLoopPath)
+        else:
+            print("No Loops deleted")
+            arcpy.CopyFeatures_management(streetSimplifiedDeleteLoopPathLOOP, streetSimplifiedDeleteLoopPath)
+            
+        arcpy.SelectLayerByAttribute_management("tempLayer1", "NEW_SELECTION", expression)
+        if int(arcpy.GetCount_management("tempLayer1").getOutput(0)) > 0:
+            print("Detected Loop")
+            arcpy.DeleteFeatures_management("tempLayer1")
+            arcpy.CopyFeatures_management("tempLayer1", streetRailMergeDeleteLoopPath)
+        else:
+            print("No loops detected")
+            arcpy.CopyFeatures_management(streetRailMergePathLOOP, streetRailMergeDeleteLoopPath)  
+        removeShapeFile(streetSimplifiedDeleteLoopPathLOOP)
+        removeShapeFile(streetRailMergePathLOOP)
     
     in_street = txtFileInputPath + "\\" + "streetRailMerge.shp"
     buildings = txtFileInputPath + "\\" + "USU_USUandSingleBuildings.shp"

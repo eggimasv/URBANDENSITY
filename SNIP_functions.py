@@ -3571,9 +3571,9 @@ def SNIP(OnlyExecuteMerge, outListFolder, runNr, nodes, anteilDaten, streetNetwo
     
     flowIfSameCheck(final_wwtps, aggregatetPoints)                                                  # Check if flow is lost
     
-    arcpy.AddMessage("ZtoReach: " + str(ZtoReach))
-    arcpy.AddMessage("SNIP is successfully calculated.")
-    arcpy.AddMessage("Costs per iteration:" + str(totalSystemCosts))
+    print("ZtoReach: " + str(ZtoReach))
+    print("SNIP is successfully calculated.")
+    print("Costs per iteration:" + str(totalSystemCosts))
     MergeTime, ExpansionTime = 0, 0
                         
     return ExpansionTime, MergeTime, final_Network, flowPoints, WWTPs, final_wwtps, final_Pumps, edgeList, completePumpCosts, completeWWTPCosts, completePublicPipeCosts, totalSystemCosts, buildings, buildPoints, aggregatetPoints
@@ -4679,7 +4679,10 @@ def addedgesID(edges, streetVertices):
                 p0 = [i[0], p1x, p1y, i[3]]
             if i[1] == p2x and i[2] == p2y:
                 p1 = [i[0], p2x, p2y, i[3]]
-                
+        
+        #print("p0: " + str(p0))
+        #print("p1: " + str(p0))
+        #print"----"        
         distanz, slope, _ = distanceCalc3d((p0[1], p0[2], p0[3]), (p1[1], p1[2], p1[3]))
         
         if distanz != 0:

@@ -34,7 +34,7 @@
 # Date:      1.01.2015
 # Autor:     Eggimann Sven
 # ======================================================================================
-def collectDataAllRunsBefore(path):
+def collectDataAllRuns(path):
     '''
     Collects 
     '''
@@ -44,13 +44,12 @@ def collectDataAllRunsBefore(path):
     # Get the folders
     folderList = os.listdir(path) 
     for folder in folderList:
-        resultFolder.append(path[:-1] + folder)
-
+        resultFolder.append(path + folder)
     return resultFolder
 
 # Non-Cluster
 pythonScriptPath = "C://Users/eggimasv/URBANDENSITY/P4/"    # Path to Python SNIP Files
-txtFileInputPath = "C://P4_CH//300501//"                    # Path with stored data files (.txt files)
+txtFileInputPath = "C://P4_CH//10001//"                    # Path with stored data files (.txt files)
 OnlyExecuteMerge = 0
 
 # Imports
@@ -63,11 +62,14 @@ sys.path.append(pythonPath)
 # Calculation Parameter
 calculateTRI, calculateNN, calculateVRM = 0, 0, 0   # Calculate topographic factors
 randomPontGeneration = 0                           # Used for random point generation
-writeInArcGIS = 0                                   # Create ArcGIS Output
+writeInArcGIS = 1                                   # Create ArcGIS Output
 drawHouseConnections = 0                            # House Connections are drawn in ArcGIS, 0: House Connections are not drawn in ArcGIS
-clusterCalculation = 1                              # Calculation on EMPA: 1
+clusterCalculation = 0                              # Calculation on EMPA: 1
 FAST = 0                                            # Used for FAST Calculation
 startNodeCheck = 0                                  # Used if selecting startnode from list
+
+# Change Slope depending on Scenario
+minSlope = 1.5   # Always three digits                                     # [%] Criteria of minimum slope without pumps needed
 
 # Importing functions
 def rewritePath(inPath):
@@ -109,8 +111,6 @@ if clusterCalculation == 0:
         # Path python scripts
         pathWriteoutScript = "C://Users/eggimasv/URBANDENSITY/P4/writeResults.py"             # Script to write out results                                               # Path with textfiles
 
-        # FAST Input Values
-        #txtFASTInputPath = "Q://Abteilungsprojekte/Eng/SWWData/Eggimann_Sven/13-R/fast_InputValues.txt"  # Path to folder with .txt files 
         
         # Path with .txt files
         txtFileInputPath = rewritePath(txtFileInputPath)    # Rewrite paths
@@ -119,6 +119,9 @@ if clusterCalculation == 0:
         # Path to result folder
         resultPath = txtFileInputPath + "GIS_PYTHON" + "/"  
         sys.argv.append(resultPath)
+        
+        if not os.path.exists(resultPath):
+            os.mkdir(resultPath)
 
         Input_VARIABLE = 0                                  # Only active if local python
         print("FOLDER WITH TXTS: " + str(txtFileInputPath))
@@ -127,46 +130,48 @@ else:
 
     # Claster Calculation
     print("Cluster Calculations")
-    _, Input_VARIABLE = sys.argv[0], int(sys.argv[1])  
-    POSITIONCATCHEMENT = int(sys.argv[1])  #???
+    _, POSITIONCATCHEMENT = sys.argv[0], int(sys.argv[1])  
+    Input_VARIABLE =  POSITIONCATCHEMENT
+       
+    print("Sys.argv")
+    print(sys.argv)
     
-    SLOPE = 100
- 
+    # Get path from Dictionary with all Paths
+    pathFoldersWithCatchements = r"/mnt/project/eggimasv/P4/P4_CH_NEU/" #"\\mnt\\project\\eggimasv\\P4\\P4_CH\\"
+    ListWithWWTPCatchments = collectDataAllRuns(pathFoldersWithCatchements)   # Iterate Folders to get patsh
+    
+    catchmentPath = ListWithWWTPCatchments[POSITIONCATCHEMENT]
+    print("catchmentPath: " + str(catchmentPath))
+
     pathWriteoutScript = "\\mnt\\project\\eggimasv\\P4\\01PythonScripts\\writeResults.py"     # Script to write out results                  
     pythonScriptPath = "\\mnt\\project\\eggimasv\\P4\\01PythonScripts\\"            # Path to folder with SNIP python scripts
+            
+    txtFileInputPath = catchmentPath + r"/" #+ "GIS_PYTHON" + r"/"
     
-    # Folder to do calculations
-    txtFileInputPath = "//mnt//project//eggimasv//01-txts//01-trubschachen//"
-
-    pathFoldersWithCatchements = "\\mnt\\project\\eggimasv\\P4_CH\\"
-    ListWithWWTPCatchments = collectDataAllRunsBefore(pathFoldersWithCatchements)   # Iterate Folders to get patsh
-    
-    
-    
-    txtFileInputPath = ListWithWWTPCatchments[POSITIONCATCHEMENT] + "\\"
-    print("txtFileInputPath POSITIONCATCHEMENT: " + str(txtFileInputPath))
+    # Create Result Folder
+    #if not os.path.exists(txtFileInputPath):
+    #    os.mkdir(txtFileInputPath)
     
     # GET RESULTPATH FROM DICTIONARY DEPENDING On POSITION
-    #resultPath = DICTIONARYWITHPATHS[Input_VARIABLE]
-        
-    resultPath = txtFileInputPath + "\\" + "Calculations_" + str(SLOPE) "//"           # STARTNODE
+    strMinSlope = str(minSlope)
+    nameMinSlope = str(strMinSlope.replace(".", "_"))
     
-    # 
+    resultPath = txtFileInputPath + "\\" + "SNIP_" + str(nameMinSlope) + "\\"           # STARTNODE
     
     pythonScriptPath = rewritePath(pythonScriptPath)
     txtFileInputPath = rewritePath(txtFileInputPath)
     resultPath = rewritePath(resultPath)
     
+    # Create Result Folder
+    if not os.path.exists(resultPath):
+        os.mkdir(resultPath)
+        
     sys.path.append(pythonScriptPath)                                               # Append paths
     sys.path.append(txtFileInputPath)                                               # Append paths
     print("A: " + str(txtFileInputPath))
     
-    prnt("..")
+    #prnt("..")
     
-# create new Folder
-if randomPontGeneration == 0:
-    if not os.path.exists(resultPath):
-        os.mkdir(resultPath)
     
 # Imports
 from SNIP_functions import *
@@ -177,7 +182,7 @@ print("all imports complete")
 # Sewer related
 maxTD = 8                                   # [m] Maximum trench depth
 minTD = 0.25                                # [m] Min trench depth
-minSlope = 1                                # [%] Criteria of minimum slope without pumps needed
+#minSlope = 1                                # [%] Criteria of minimum slope without pumps needed
 stricklerC = 85                             # [m3/s] Stricker Coefficient
 EW_Q = 0.162                                # [m3 / day] 1 EW is equal to 162 liter. This factor must be the same as for the GIS-Files
 
@@ -250,10 +255,6 @@ if clusterCalculation == 1:
         rasterPointsNew.append(i)
     rasterPoints = rasterPointsNew
 
-'''outListFolder = txtFileInputPath + "_SNIP_SCRAPPY" + "/"     
-if not os.path.exists(outListFolder):
-    os.mkdir(outListFolder)
-'''
 outListFolder = resultPath
 
 # Select specific starting node
@@ -305,7 +306,7 @@ totSystemCostsNoPrivate = completePumpCosts  + completeWWTPCosts + completePubli
 totSystemCostsWithPrivate = completePumpCosts  + completeWWTPCosts + completePublicPipeCosts + totCostPrivateSewer
 
 # Write out results # CHANTE CLUSTERCALUCTIONS-?
-if clusterCalculation == 0 and randomPontGeneration == 0:
+if clusterCalculation == 1 or clusterCalculation == 0:
     writeToDoc(resultPath, "result_" + str(Input_VARIABLE) + "_VerticGraph", VerticGRAPH)
     writeTotxt(resultPath, "result_" + str(Input_VARIABLE) + "_pointsPrim", pointsPrim)
     writeTotxt(resultPath, "result_" + str(Input_VARIABLE) + "_WWTPs", WWTPs)

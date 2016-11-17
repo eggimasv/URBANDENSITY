@@ -405,7 +405,7 @@ def fromLocalCRgetDensity(localCR):
 
 # -----------
 
-def getCostCentralTreatment(PE):
+'''def getCostCentralTreatment(PE):
     ''' 
     cost curves from paper II. Returns in Dollars
     idleCapacityinPercent     -     How much idle capacity
@@ -426,7 +426,7 @@ def getCostCentralTreatment(PE):
     
     annuity_CHFtotal = annuity_CHF * PE
     return annuity_CHFtotal
-
+'''
 
 
 # Replace costWWTP with III costcurves

@@ -56,7 +56,7 @@ import arcpy
 
 #inputArgument = sys.argv[1]     # Path of calculated results file from python SNIP file
 inputArgument = "C:\\_SCRAP_FOLDERSTRUCTURE\\414100\\GIS_PYTHON\\"
-inputArgument = "C:\\_SCRAP_FOLDERSTRUCTURE\\430900\\GIS_PYTHON\\"
+inputArgument = "C:\\P4_CH\\10001\\GIS_PYTHON\\"
 
 print"Input Argument from SNIP_python: " + str(inputArgument)
     

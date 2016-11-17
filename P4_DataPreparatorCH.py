@@ -6,7 +6,7 @@ import os
 
 
 # Inputs
-pathToGenerateFolderStructure = "C:\P4_CH"            
+pathToGenerateFolderStructure = "C:\P4_CH_NEU"            
 inputShapeCHPaths = "Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\04-finalCH"  # Path with WWTP Catchements
 inputShapeWithWWTP = inputShapeCHPaths + "\\" + "WWTP_catchements2014_ALLDATA.shp"  # Path with WWTP Catchements
 
@@ -35,7 +35,7 @@ for row in rows:
     # CH datasetz
     WWTPgeometry = inputShapeWithWWTP + "\\" + "WWTP_catchements2014.shp"
     DEM_CH = inputShapeWithWWTP + "\\" + "CH_dem100.shp"
-    street_CH = inputShapeWithWWTP + "\\" + "CH_StreetV25_simplified.shp"
+    street_CH = inputShapeWithWWTP + "\\" + "CH_Street25_NEU_simplified.shp"
     geb_CH = inputShapeWithWWTP + "\\" + "CH_buildings_data_ARA_pt_inhabited.shp"
     railroad_CH = inputShapeWithWWTP + "\\" + "CH_railroad.shp"
     settlement_CH = inputShapeWithWWTP + "\\" + "CH_settlementArea.shp"

@@ -90,8 +90,7 @@ print("---------------------------")
 # Path to SEGME.exe of GME
 pathToSEGME = r'C:\Users\eggimasv\AppData\Local\Apps\2.0\BN23RV48.G12\9DDGL0P7.2AJ\segm..tion_c23e290fb11c064b_0001.0000_143886b27f0a8c90\SEGME.exe'
 
-pathForGMECommands = r'Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\02_GIS_BERN\\'
-pathForGMECommands = r'C:\\P4_CH\\'
+pathForGMECommands = r'C:\\P4_CH_NEU\\'
 
 
 # Global Variables
@@ -111,7 +110,7 @@ BetweenSteps = False
 # ----------------------------------------------------------------------
 if BetweenSteps == True:
     #subp.call(str(pathToSEGME) + r' -c run(in=\"C:\_SCRAP_FOLDERSTRUCTURE\GMEcommands.txt\");');
-    subp.call(str(pathToSEGME) + r' -c run(in=\"C:\P4_CH\GMEcommands.txt\");');
+    subp.call(str(pathToSEGME) + r' -c run(in=\"C:\P4_CH_NEU\GMEcommands.txt\");');
 
 # ------------------------------------------------------------------------------------------
 
@@ -149,7 +148,6 @@ for pathCatchement in ListWithWWTPCatchments:
     pathRailwayUSU = str(pathCatchement) + "\\" + "railwayNetwork.shp"
     pathSettlementArea = str(pathCatchement) + "\\" + "settlementArea.shp"
     pathBuildings = str(pathCatchement) + "\\" + "buildings_inhabited.shp"
-    
     pathstreetRailMerge = pathCatchement + "\\" + "streetRailMerge.shp"
       
     if afterGME == False:
@@ -427,6 +425,7 @@ for pathCatchement in ListWithWWTPCatchments:
         else:
             outFeatureSingleBuildingsAndUSU = str(pathCatchement) + "\\" + "USU_USUandSingleBuildings" + ".shp"
             arcpy.Merge_management([outFeaturesSingleBuildings], outFeatureSingleBuildingsAndUSU)
+        
         #------------------------------------------------------------------------------------------------------------------------
         # 13. Generate definitiv USU_ID Field and assign USU_ID
         #------------------------------------------------------------------------------------------------------------------------
@@ -446,7 +445,6 @@ for pathCatchement in ListWithWWTPCatchments:
         #------------------------------------------------------------------------------------------------------------------------
         # 14. Update Fields & Near Analysis of all USU with street
         # Update Near X, Near Y
-        # Update Q (TODO:
         #------------------------------------------------------------------------------------------------------------------------   
         # Update X and Y Coordinate (X_Point, Y_Point)
         xExpression = 'float(!shape.firstpoint!.split() [0])'
@@ -490,6 +488,7 @@ for pathCatchement in ListWithWWTPCatchments:
             removeShapeFile(outFeaturesSingleBuildings)
         except:
             print("no Singel buildlings to deltete")
+        
         removeShapeFile(outFeatures)
         
         try:
@@ -504,6 +503,8 @@ for pathCatchement in ListWithWWTPCatchments:
             removeShapeFile(outFeatureJoinCentroids)
         except:
             print"not outFeatureJoinCentroids"
+        try:
+            removeShapeFile(outTableSingleFeatureUSU)
+        except:
+            print("noDelete")
         #os.remove(summaryTable)
-        
-    
