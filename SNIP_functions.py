@@ -6067,7 +6067,7 @@ def readInRasterPoints(pathRasterPoints):
         demPnts.append([int(lineElements[0][1:-1]), float(lineElements[1][:-1]), float(lineElements[2][:-1]), float(lineElements[3][0:-1])])
         
         
-        # Calculate rasterCellSize by selecting the two first cell and calculate x-difference
+    # Calculate rasterCellSize by selecting the two first cell and calculate x-difference
     count = 0
     for cellPoint in demPnts[:2]:  
         secondX = cellPoint[1]

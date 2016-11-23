@@ -89,13 +89,15 @@ def plotFigureCantons3Classes(statisticsPerCatchement):
     # Sum population percentages for each canton for the three scenario
     for i in statisticsPerCatchement:
         ARANr = i[0]
-        print("Entry Statistics per Catchement: " + str(i))
+        #print("Entry Statistics per Catchement: " + str(i))
         if ARANr not in ARANrAdded: # if not already added catchement
             
-            # Add populations
-            # Sum 
+            # Sum populations
             ktLabel = i[2]
             catchmentPop = i[7]
+            #print("catchmentPop: " + str(catchmentPop))
+            #print("ktDict[ktLabel][0]: " + str(ktDict[ktLabel][0]))
+            #print("dd: " + str(i[18]))
             
             #  Sum populations for different scenarios in KT dictionary
             ktDict[ktLabel][0] = ktDict[ktLabel][0] + catchmentPop* i[18]   # Summ 05 slope, small
@@ -114,8 +116,6 @@ def plotFigureCantons3Classes(statisticsPerCatchement):
     for ktLabel in ktDict:
         sum100Percent = ktDict[ktLabel][3] + ktDict[ktLabel][4] + ktDict[ktLabel][5]
         print("sum100Percent: " + str(sum100Percent))
-        
-        
         if sum100Percent is not 0:
             ktDict[ktLabel][0] = (100.00 / sum100Percent) * ktDict[ktLabel][0]   # Conert to percentages
             ktDict[ktLabel][1] = (100.00 / sum100Percent) * ktDict[ktLabel][1]   # Conert to percentages
@@ -140,8 +140,17 @@ def plotFigureCantons3Classes(statisticsPerCatchement):
     print"----------------------"
     for i in ktDict:
         print(str(i) + str("   : ") + str(ktDict[i]))
+        
+        
+    # Sort Dictioanry according to large connecction
+    from collections import OrderedDict
     
+    ktDict = OrderedDict(sorted(ktDict.items(), key=lambda t: t[1][5])) # Stort according to percetnage large connected
     
+    print("Sortes Dictionary")
+    for i in ktDict:
+        print(str(i) + str("   : ") + str(ktDict[i]))
+
     # Iterate Dictioanry 
     smallPercentage, middlePercentage, largePercentage = [], [], []
     smallPercentage_Std, middlePercentage_Std, largePercentage_Std = [], [], []
@@ -160,29 +169,37 @@ def plotFigureCantons3Classes(statisticsPerCatchement):
         XLabelsList.append(ktLabel)                      # Append label
     
     # Figure
-    fig, ax = plt.subplots(facecolor="white")
+    fig, ax = plt.subplots(facecolor="white", figsize=(16,10))
+    
+    #plt.figure(figsize=(18,10))
     
     N = len(ktDict) #len(dataList)
     ind = np.arange(N)    # the x locations for the groups
     width = 0.8       # the width of the bars: can also be len(x) sequence
     
-    #plt.bar(ind, [largePercentage, middlePercentage, smallPercentage])
     
-    plt.bar(ind, largePercentage, width, color='#8da0cb', ecolor='gray', label="Large", yerr=largePercentage_Std) # 
-    plt.bar(ind, middlePercentage, width, color='#66c2a5', ecolor='gray', bottom=largePercentage, label="Middle", yerr=middlePercentage_Std) #
-    plt.bar(ind, smallPercentage, width, color='#fc8d62', ecolor='gray', bottom=[i+j for i,j in zip(largePercentage, middlePercentage)], label="Small", yerr=smallPercentage_Std)
+    #plt.bar(ind, [largePercentage, middlePercentage, smallPercentage])   alpha=.9
     
-    # Error Bars
-    #plt.errorbar(ind+(width/2), largePercentage, yerr=largePercentage_Std, fmt='', color='cadetblue', linestyle='None')
-    #plt.errorbar(ind+(width/2), middlePercentage, yerr=middlePercentage_Std, fmt='', color='black', linestyle='None')
-    #plt.errorbar(ind+(width/2), smallPercentage, yerr=largePercentage_Std, fmt='', color='bisque', linestyle='None')
+    plt.bar(ind, largePercentage, width, color='#ece7f2', ecolor='orange', label=" Cat. A (>200PE)", yerr=largePercentage_Std, hatch="") # 8da0cb
+    plt.bar(ind, middlePercentage, width, color='#a6bddb', ecolor='orange', bottom=largePercentage, label="Cat. B (20-200PE)", yerr=middlePercentage_Std, hatch="x") #66c2a5
+    plt.bar(ind, smallPercentage, width, color='#2b8cbe', ecolor='orange', bottom=[i+j for i,j in zip(largePercentage, middlePercentage)], label="Cat. C (<20 PE)", yerr=smallPercentage_Std, hatch="") #fc8d62
 
+    
+    # Achsenbeschriftungen Elemente
+    #axis_font = {'fontname':'Arial'} #, 'size':'10'
+        
     plt.ylabel('Population [%]')
+    plt.xlabel("Swiss Cantons")
+    
     plt.title('Cantons')
     
-    #plt.xticks(ind + width/2, XLabelsList)
+
+    
     ax.set_xticks(ind + width/2)
     ax.set_xticklabels(XLabelsList)
+    
+    ax.set_yticks([0,20,40,60,80,100])
+    ax.set_yticklabels([0,20,40,60,80,100]) # **axis_font
     
     # Legend
     
@@ -196,56 +213,124 @@ def plotFigureCantons3Classes(statisticsPerCatchement):
     plt.xlim([0,lengthXaxis])
     
     plt.show()
+    return
+
+
+
+
+def plotAllCatchements(statisticsPerCatchementAll, listCantons): # listCantons --> ['ZH', 'BE']
+
+    """
+    ARA_NR, 
+    kantonNr, 
+    ktLabel, 
+    gemeindeNr, 
+    regularpopDensity, 
+    NeighborhoodDensity, 
+    totCatchmentArea, 
+    totPopCatchement, 
+    totSettlmentAreaCatchement, 
+                    
+    # Standard Scenario
+    slopeCriteria_standardScenario,          
+    Z_SNIP_standardScenario, 
+    Z_weighted_SNIP_standardScenario, 
+    percentageSmallWWTP_SNIP_standardScenario, 
+    percentageMiddle_SNIP_standardScenario, 
+    percentageLarge_SNIP_standardScenario, 
+                    
+    # Slope 0.5 Scenario
+    slopeCriteria_scenario05,
+    Z_SNIP_scenario05,
+    Z_weighted_SNIP_scenario05,
+    percentageSmallWWTP_SNIP_scenario05,
+    percentageMiddle_SNIP_scenario05,
+    percentageLarge_SNIP_scenario05,
+                    
+    # Slope 1.5 Scenario
+    slopeCriteria_scenario15,
+    Z_SNIP_scenario15,
+    Z_weighted_SNIP_scenario15,
+    percentageSmallWWTP_SNIP_scenario15,
+    percentageMiddle_SNIP_scenario15,
+    percentageLarge_SNIP_scenario15,
+            
+    # Std Deviation for individual catchements
+    stdv_Z_SNIP, 
+    stdv_Z_weighted_SNIP, 
+    stdv_percentageSmallWWTP_SNIP, 
+    stdv_percentageMiddle_SNIP, 
+    stdv_percentageLarge_SNIP
+    
+    """
+
+    # get only these entries for the defined canton
+    # ----------------------------------------
+    statisticsPerCatchement = []
+    
+    for canton in listCantons:
+        for i in statisticsPerCatchementAll:
+            if i[2] == canton:
+                statisticsPerCatchement.append(i)
+             
+    print("Anzahl WWTP Catchements im Kanton(en) " + str(len(statisticsPerCatchement)))
+    
+    # Sort List
+    statisticsPerCatchement = sorted(statisticsPerCatchement, key=lambda d: d[14])
     
     
+    smallPercentage, middlePercentage, largePercentage = [], [], []
+    smallPercentage_Std, middlePercentage_Std, largePercentage_Std = [], [], []
     
-    '''
-    import numpy as np
-    import matplotlib.pyplot as plt
-    
-    N = 5
-    cantonData0 = (20, 35, 30, 35, 27)
-    menStd = (2, 3, 4, 1, 2)
-    
-    ind = np.arange(N)  # the x locations for the groups
-    width = 0.35       # the width of the bars
-    
-    
+    XLabelsList = [] 
+        
+    for catchment in statisticsPerCatchement:
+        smallPercentage.append(catchment[12] * 100)      # standard scenario small
+        middlePercentage.append(catchment[13]* 100)     # standard scenario small
+        largePercentage.append(catchment[14]* 100)      # standard scenario small
+        
+        smallPercentage_Std.append(catchment[29]* 100)      # standard deviation append small
+        middlePercentage_Std.append(catchment[30]* 100)      # standard deviation append small
+        largePercentage_Std.append(catchment[31]* 100)      # standard deviation append small
+        
+        XLabelsList.append(catchment[0])                      # Append label
+
     # Figure
     fig, ax = plt.subplots(facecolor="white")
+
     
+    N = len(statisticsPerCatchement) #len(dataList)
+    ind = np.arange(N)    # the x locations for the groups
+    width = 0.8       # the width of the bars: can also be len(x) sequence
     
-    rects1 = ax.bar(ind, cantonData0, width, color='b', yerr=menStd)
+    #plt.bar(ind, [largePercentage, middlePercentage, smallPercentage])   alpha=.9
     
-    womenMeans = (25, 32, 34, 20, 25)
-    womenStd = (3, 5, 2, 3, 3)
-    rects2 = ax.bar(ind + width, womenMeans, width, color='g', yerr=womenStd)
+    plt.bar(ind, largePercentage, width, color='#ece7f2', ecolor='orange', label=" Cat. A (>200PE)", yerr=largePercentage_Std, hatch="") # 8da0cb
+    plt.bar(ind, middlePercentage, width, color='#a6bddb', ecolor='orange', bottom=largePercentage, label="Cat. B (20-200PE)", yerr=middlePercentage_Std, hatch="x") #66c2a5
+    plt.bar(ind, smallPercentage, width, color='#2b8cbe', ecolor='orange', bottom=[i+j for i,j in zip(largePercentage, middlePercentage)], label="Cat. C (<20 PE)", yerr=smallPercentage_Std, hatch="") #fc8d62
+
+    # Error Bars
+    #plt.errorbar(ind+(width/2), largePercentage, yerr=largePercentage_Std, fmt='', color='cadetblue', linestyle='None')
+    #plt.errorbar(ind+(width/2), middlePercentage, yerr=middlePercentage_Std, fmt='', color='black', linestyle='None')
+    #plt.errorbar(ind+(width/2), smallPercentage, yerr=largePercentage_Std, fmt='', color='bisque', linestyle='None')
+
+    plt.ylabel('Population [%]')
+    plt.xlabel('BFS Number of catchements in Canton')
+    #plt.title('Figure with catchements in Canton')
     
-    # add some text for labels, title and axes ticks
-    ax.set_ylabel('Scores')
-    ax.set_title('Scores by group and gender')
-    ax.set_xticks(ind + width)
-    
-    
-    # X Axis labels
-    ax.set_xticklabels(('G1', 'G2', 'G3', 'G4', 'G5'))
-    
+    ax.set_xticks(ind + width/2.0)
+    ax.set_xticklabels(XLabelsList, rotation='vertical')
     
     # Legend
-    ax.legend((rects1[0], rects2[0]), ('Men', 'Women'))
+    # Place a legend above this subplot, expanding itself to fully use the given bounding box.
+    #plt.legend(bbox_to_anchor=(0, 1.02, 1., .102), loc=8, ncol=3, mode="expand", borderaxespad=0., frameon=None)
     
     
-    def autolabel(rects):
-        # attach some text labels
-        for rect in rects:
-            height = rect.get_height()
-            ax.text(rect.get_x() + rect.get_width()/2., 1.05*height,
-                    '%d' % int(height),
-                    ha='center', va='bottom')
-    
-    autolabel(rects1)
-    autolabel(rects2)
+    # Axis 
+    plt.ylim(0, 100)
+    lengthXaxis =len(ind) #*width   # Total x axis length
+    plt.xlim([0,lengthXaxis])
     
     plt.show()
-    '''
     return
+
