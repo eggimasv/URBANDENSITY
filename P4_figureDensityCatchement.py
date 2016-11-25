@@ -9,14 +9,10 @@ import glob
 import os
 
 
-
 # Import for curve fit
 import math, random, numpy, copy                    # Import Numpy for standard deviation
 from scipy.optimize import curve_fit # Packate scipy
 print("Sucseeful loading functions_transport")
-
-
-
 
 def func2(params, x, data):
     m = params['m'].value
@@ -25,8 +21,7 @@ def func2(params, x, data):
     model = np.power(x,m)*c + d
     return model - data #that's what you want to minimize
 
-
-def createPowerFit(xList, YList):
+def createFit(xList, YList):
 
     from scipy.optimize import curve_fit
     import numpy as np 
@@ -40,11 +35,11 @@ def createPowerFit(xList, YList):
     params.add('d', value= 0, min=0)    # min=0 prevents that d becomes negative
     
     # do fit, here with leastsq model
-    result = minimize(func2, params, args=(xList, YList))
-    
+    result = minimize(func2, params, args=(xList, YList)) # Power Fit
+ 
     #R_squred = result.rsquared
-    a = 1 - result.residual.var() / np.var(YList)
-    print("R-Squared: " + str(a))
+    r_squared = 1 - result.residual.var() / np.var(YList)
+    print("R-Squared: " + str(r_squared))
     b =  1 - result.redchi / np.var(YList, ddof=2)
     print("R-SQUARED: " + str(b))
 
@@ -61,6 +56,7 @@ def createPowerFit(xList, YList):
     
     reduced_chi_square = result.redchi
     print("reduced_chi_square: " + str(reduced_chi_square))
+    
     #----
     f = result.params
     m = f['m'].value
@@ -70,7 +66,9 @@ def createPowerFit(xList, YList):
     print("c value: " + str(c))
     print("d value: " + str(d))
     report_fit(params)        # All Infos
-    return m, c, d
+    return m, c, d, r_squared
+
+
 
 def collectDataAllRunsBefore(path):
     '''
@@ -146,6 +144,7 @@ def figureRetularDensityCatchement(statisticsPerCatchement):
     standardScenarioMiddlePercentageList = []
     densityRetularList = []
     densityNeighbourhoodList = []
+    standardScenarioSmallAndMiddle = []
     
     # Sum population percentages for each canton for the three scenario
     for i in statisticsPerCatchement:
@@ -156,50 +155,43 @@ def figureRetularDensityCatchement(statisticsPerCatchement):
         totPopCatchement = i[7]
         SmallPercent01 = i[12]
         MiddlePercent01 = i[13]
+    
+        scrap = ((SmallPercent01 + MiddlePercent01)*100)
+        if int(scrap) > 100.0:
+            print("ERROR")
+            prnt("...")
+            
+        # Alternative Mausre (settlement area/tot area)
+        # SCRAP REMOVE
+        #densityRetular = densityRetular * (i[8]/totCatchmentArea)
         
-        # ADd to list                
+        # Convvert to expoenntial data --> Convert X-Axis value to Log in order to make sensible r_quared test
+        #MiddlePercent01 = math.log(SmallPercent01)
+        #densityRetular = math.log(densityRetular)
+        
+        # Add to list                
         standardScenarioSmallPercentageList.append(SmallPercent01 * 100) # In % --> 1 -> 1%
         standardScenarioMiddlePercentageList.append(MiddlePercent01 * 100) # In % --> 1 -> 1%
+        standardScenarioSmallAndMiddle.append((SmallPercent01 + MiddlePercent01)*100)
         densityRetularList.append(densityRetular)
         densityNeighbourhoodList.append(NeighbourhoodDensity)
     
-    
+    '''print("WIESO HUHN")
+    for a,b in zip(densityRetularList, standardScenarioSmallPercentageList):
+        print a,b
+    prnt("...")
+    '''
     plt.figure(facecolor="white")        # Remove grey background
     
     # Regular Density
-    scatterA = plt.scatter(densityRetularList, standardScenarioSmallPercentageList, color="peru", marker = "o", edgecolor='black', zorder=2)
-    scatterB = plt.scatter(densityRetularList, standardScenarioMiddlePercentageList, color="green", marker = "+", edgecolor='black', zorder=2)
+    #scatterA = plt.scatter(densityRetularList, standardScenarioSmallPercentageList, color="peru", marker = "o", edgecolor='black', zorder=2)
+    #scatterB = plt.scatter(densityRetularList, standardScenarioMiddlePercentageList, color="green", marker = "+", edgecolor='black', zorder=2)
+    scatterC = plt.scatter(densityRetularList, standardScenarioSmallAndMiddle, color="blue", marker = "o", edgecolor='black', zorder=2)
+    scatterD = plt.scatter(densityNeighbourhoodList, standardScenarioSmallAndMiddle, color="green", marker = "+", edgecolor='black', zorder=2)
     
     # Catchement Density
     #plt.scatter(densityNeighbourhoodList, standardScenarioSmallPercentageList, color="green", marker = "o", edgecolor='black', zorder=2)
     #plt.scatter(densityNeighbourhoodList, standardScenarioMiddlePercentageList, color="green", marker = "o", edgecolor='black', zorder=2)
-    
-    
-    # Draw Power functionscatterB
-    # ------------------
-    '''m_scatterA,c_scatterA,d_scatterA = createPowerFit(densityRetularList, standardScenarioSmallPercentageList)
-    x_function_scatterA = np.linspace(1000000, 0.1, 1000) # Until which value, Abstand x-axis, Number of points for creating the line
-    y_function_scatterA = x_function_scatterA**m_scatterA * c_scatterA + d_scatterA
-    
-    plt.plot(x_function_scatterA, y_function_scatterA, '-', color='peru')
-    
-    print("m_scatterA: " + str(m_scatterA))
-    print("c_scatterA: " + str(c_scatterA))
-    print("d_scatterA d: " + str(d_scatterA))
-    
-    # Draw Power function scatterB
-    # ------------------
-    m_scatterB,c_scatterB,d_scatterB = createPowerFit(densityRetularList, standardScenarioMiddlePercentageList)
-    x_function_scatterB= np.linspace(10000, 0.2, 1000) # Until which value, Abastand x-axis, Number of points for creating the line
-    y_function_scatterB = x_function_scatterB**m_scatterB * c_scatterB + d_scatterB
-    
-    plt.plot(x_function_scatterB, y_function_scatterB, '-', color='peru')
-    
-    
-    print("m_scatterB: " + str(m_scatterB))
-    print("c_scatterB: " + str(c_scatterB))
-    print("d_scatterB d: " + str(d_scatterB))
-    '''
     
     # Data Series
     ax = plt.subplot(111)
@@ -222,33 +214,127 @@ def figureRetularDensityCatchement(statisticsPerCatchement):
     ax.spines['right'].set_visible(False)
         
     # Legend
-    plt.legend((scatterA, scatterB), ('Cat WWTP A', 'Cat WWTP B'), scatterpoints=1, loc='upper right', ncol=1, fontsize=10)
+    #plt.legend((scatterA, scatterB, scatterC), ('Cat WWTP A', 'Cat WWTP B', 'Cat WWTP A + B'), scatterpoints=1, loc='upper right', ncol=1, fontsize=10)
     
-    
-    # Draw Power function
+    # Draw Power functions
     # -------------------
-    m,c,d = createPowerFit(densityRetularList, standardScenarioSmallPercentageList)
+    '''#Small
+    m,c,d, r_squared = createFit(densityRetularList, standardScenarioSmallPercentageList)
     x_function = np.linspace(5, 4000, 1000) # ?, X-Axis, Number of points for creating the line
     y_function_unscheduled = x_function**m * c + d
     #plt.plot(x_function, y_function_unscheduled, '-', color='peru')
     plt.semilogx(x_function, y_function_unscheduled, '-', color='peru')
     
-    m1,c1,d1 = createPowerFit(densityRetularList, standardScenarioMiddlePercentageList)
+    #Middle
+    m1,c1,d1, r_squared1 = createFit(densityRetularList, standardScenarioMiddlePercentageList)
     x1_function = np.linspace(5, 4000, 1000) # ?, X-Axis, Number of points for creating the line
     y1_function_unscheduled = x1_function**m1 * c1 + d1
     #plt.plot(x1_function, y1_function_unscheduled, '-', color='green')
     plt.semilogx(x1_function, y1_function_unscheduled, '-', color='green')
+    '''
     
+    # Linear Fit
+    """import scipy
+    from scipy import stats
+    slope, intercept, r_value, p_value, std_err = scipy.stats.linregress(densityRetularList, standardScenarioSmallAndMiddle)
+    x4_function = np.linspace(5, 4000, 1000) # ?, X-Axis, Number of points for creating the line
+    y4_function = slope*x4_function + intercept
+    plt.plot(x4_function, y4_function, '-', color='pink')
+    print("r_value: " + str(r_value))
+    print("p_value: " + str(p_value))
+    print("std_err: " + str(std_err))
+    """
     
-    plt.xlim(0, 4000) #TODO: adjust
-    plt.ylim(-2, 102) #TODO: adjust
+    # Small and middle (regular densit)
+    m2,c2,d2, r_squared2 = createFit(densityRetularList, standardScenarioSmallAndMiddle)
+    x2_function = np.linspace(5, 4000, 1000) # ?, X-Axis, Number of points for creating the line
+    y2_function_unscheduled = x2_function**m2 * c2 + d2
+    plt.plot(x2_function, y2_function_unscheduled, '-', color='blue')
+    #plt.semilogx(x2_function, y2_function_unscheduled, '-', color='blue')
+    
+    # Small and middle (urban density)
+    m3,c3,d3, r_squared3 = createFit(densityNeighbourhoodList, standardScenarioSmallAndMiddle)
+    x3_function = np.linspace(5, 4000, 1000) # ?, X-Axis, Number of points for creating the line
+    y3_function_unscheduled = x3_function**m3 * c3 + d3
+    plt.plot(x3_function, y3_function_unscheduled, '-', color='green')
+    #plt.semilogx(x3_function, y3_function_unscheduled, '-', color='green')
+    
+    #Plot R2 value 
+    #plt.text(1000, 5, 'r_squared: ' + str(r_squared))
+    #plt.text(1000, 4, 'r_squared1: ' + str(r_squared1))
+    #plt.text(1000, 80, 'blue r_squared2: ' + str(r_squared2))
+    #plt.text(1000, 90, 'green r_squared3: ' + str(r_squared3))
+    
+    #plt.text(1000, 3, 'blue r_squared2: ' + str(r_squared2))
+    #plt.text(1000, 2, 'green r_squared3: ' + str(r_squared3))
+    
+    #plt.xlim(0, 4000) #TODO: adjust
+    plt.xlim(0,) #TODO: adjust
+    plt.ylim(-1, 102) #TODO: adjust
     
     # Set common labels
     ax.set_ylabel(' Percentage of Small WWTP [percent]', fontsize=10, fontname='Arial') # fontname="Arial"
     ax.set_xlabel('Population Density [PE/km2]', fontsize=10)
     
-    ax.set_xscale('log')    # Convert Y-Axis to log-
+    #ax.set_xscale('log')    # Convert Y-Axis to log-
     
     plt.show()
     
     return
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# scrapcnt
+
+def funcLinear(params, x, data):
+    a = params['a'].value
+    c = params['c'].value
+    model = x*a + c
+    return model - data #that's what you want to minimize
+
+def createLinearFit(xList, YList):
+
+    from scipy.optimize import curve_fit
+    import numpy as np 
+    import matplotlib.pyplot as plt
+    from lmfit import minimize, Parameters, Parameter, report_fit
+    
+    # create a set of Parameters
+    params = Parameters()
+    params.add('a', value= 0)
+    params.add('c', value= 0) 
+    
+    # do fit, here with leastsq model
+    result = minimize(funcLinear, params, args=(xList, YList)) # Linear Fit
+    
+    #R_squred = result.rsquared
+    r_squared = 1 - result.residual.var() / np.var(YList)
+    print("R-Squared: " + str(r_squared))
+    b =  1 - result.redchi / np.var(YList, ddof=2)
+    print("R-SQUARED: " + str(b))
+
+    #----
+    # http://stackoverflow.com/questions/22581887/python-lmfit-how-to-calculate-r-squared
+    g = result.message
+    print("G: " + str(g))
+
+    #----
+    f = result.params
+    a = f['a'].value
+    c = f['c'].value
+    print("a value: " + str(a))
+    print("c value: " + str(c))
+    report_fit(params)        # All Infos
+    return a, c, r_squared

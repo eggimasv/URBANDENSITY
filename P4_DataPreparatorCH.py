@@ -6,14 +6,19 @@ import os
 
 
 # Inputs
-pathToGenerateFolderStructure = "C:\P4_CH_NEU"            
+#pathToGenerateFolderStructure = "C:\P4_CH_NEU"   
+pathToGenerateFolderStructure = "C:\P4_GEMEINDEN" #GEMEINDEN         
 inputShapeCHPaths = "Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\04-finalCH"  # Path with WWTP Catchements
-inputShapeWithWWTP = inputShapeCHPaths + "\\" + "WWTP_catchements2014_ALLDATA.shp"  # Path with WWTP Catchements
+
+inputShapeWithWWTP = inputShapeCHPaths + "\\" + "WWTP_catchements2014_ALLDATA.shp"  # Path with WWTP Catchements 
+inputShapeWithWWTPNEwGeometry = inputShapeCHPaths + "\\" + "01GemeindeCalculations" + "\\" + "Gemeinden_GeometrieCH.shp"  # Path with WWTP Catchements #GEMEINDEN
+
 
 
 # Create Main Folder
 os.mkdir(pathToGenerateFolderStructure)                         # Create Main Folder
-rows = arcpy.da.SearchCursor(inputShapeWithWWTP, ["ARA_Nr"])    # Read WWTP numbers
+#rows = arcpy.da.SearchCursor(inputShapeWithWWTP, ["ARA_Nr"])    # Read WWTP numbers
+rows = arcpy.da.SearchCursor(inputShapeWithWWTPNEwGeometry, ["BFS_NUMMER"])    # Read WWTP numbers #GEMEINDEN       
 
 # ------------------------
 # Assign Coordinages of CH shapefiles
@@ -33,7 +38,9 @@ for row in rows:
     print("-------------------------------------------")
     
     # CH datasetz
-    WWTPgeometry = inputShapeWithWWTP + "\\" + "WWTP_catchements2014.shp"
+    #WWTPgeometry = inputShapeWithWWTP + "\\" + "WWTP_catchements2014.shp" #
+    WWTPgeometry = inputShapeWithWWTPNEwGeometry #Gemeinden
+    
     DEM_CH = inputShapeWithWWTP + "\\" + "CH_dem100.shp"
     street_CH = inputShapeWithWWTP + "\\" + "CH_Street25_NEU_simplified.shp"
     geb_CH = inputShapeWithWWTP + "\\" + "CH_buildings_data_ARA_pt_inhabited.shp"
@@ -51,7 +58,8 @@ for row in rows:
        
     # Select ARA Catchement
     arcpy.MakeFeatureLayer_management(WWTPgeometry, "lyr") 
-    selectionCatchement = arcpy.SelectLayerByAttribute_management("lyr", "NEW_SELECTION", "ARA_NR = " + str(Ara_ID))
+    #selectionCatchement = arcpy.SelectLayerByAttribute_management("lyr", "NEW_SELECTION", "ARA_NR = " + str(Ara_ID))
+    selectionCatchement = arcpy.SelectLayerByAttribute_management("lyr", "NEW_SELECTION", "BFS_NUMMER = " + str(Ara_ID)) #GEmeinden
     arcpy.CopyFeatures_management("lyr", extent_f)              # Export catchment extent
     
     #For DEM, create a rectangle around extent for clip
@@ -83,3 +91,4 @@ for row in rows:
     
     # Delete Layer Field
     arcpy.Delete_management("lyr")
+    prnt(":..")

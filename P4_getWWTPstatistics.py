@@ -595,7 +595,7 @@ for pathCatchement in ListWithWWTPCatchments:
     #prnt("..")
 
 print("-----------------------------------------------------------")
-print("Number of catchements: " + str(len(statisticsPerCatchement)))
+print("Number of catchements read in: " + str(len(statisticsPerCatchement)))
 print("-----------------------------------------------------------")
 
 '''print"FINISHED"
@@ -612,11 +612,13 @@ from P4_barcharts import *
 from P4_figureDensityCatchement import *
 
 # PLot Figure with all WWTPs
-plotAllCatchements(statisticsPerCatchement, ['AG'])
+#print(" Print all catchements of a canton")
+#plotAllCatchements(statisticsPerCatchement, ['LU'])
 
 # Plot Figure with Cnatons and percetnages 
-plotFigureCantons3Classes(statisticsPerCatchement)
+##plotFigureCantons3Classes(statisticsPerCatchement)
 
 
 # PLot Densitiey and percentage for catchements
+print(" Print all densities")
 figureRetularDensityCatchement(statisticsPerCatchement)

@@ -296,7 +296,7 @@ def plotAllCatchements(statisticsPerCatchementAll, listCantons): # listCantons -
         XLabelsList.append(catchment[0])                      # Append label
 
     # Figure
-    fig, ax = plt.subplots(facecolor="white")
+    fig, ax = plt.subplots(facecolor="white", figsize=(16,10))
 
     
     N = len(statisticsPerCatchement) #len(dataList)
@@ -316,7 +316,7 @@ def plotAllCatchements(statisticsPerCatchementAll, listCantons): # listCantons -
 
     plt.ylabel('Population [%]')
     plt.xlabel('BFS Number of catchements in Canton')
-    #plt.title('Figure with catchements in Canton')
+    plt.title('Figure with catchements in Canton(s): ' + str(listCantons))
     
     ax.set_xticks(ind + width/2.0)
     ax.set_xticklabels(XLabelsList, rotation='vertical')

@@ -94,7 +94,7 @@ plt.scatter(catchmentDimension, density, color="peru", marker = "o", edgecolor='
 
 # Draw Power function
 # -------------------
-m,c,d = createPowerFit(catchmentDimension, density)
+''''m,c,d = createPowerFit(catchmentDimension, density)
 x_function = np.linspace(1000000, 0.1, 1000) # Until which value, Abastand x-axis, Number of points for creating the line
 y_function_unscheduled = x_function**m * c + d
 plt.plot(x_function, y_function_unscheduled, '-', color='peru')
@@ -102,6 +102,7 @@ plt.plot(x_function, y_function_unscheduled, '-', color='peru')
 print("m: " + str(m))
 print("c: " + str(c))
 print("d: " + str(d))
+'''
 
 # Data Series
 ax = plt.subplot(111)
