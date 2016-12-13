@@ -71,6 +71,7 @@ import arcpy
 
 #inputArgument = sys.argv[1]     # Path of calculated results file from python SNIP file
 inputArgument = "C:\\P4_CH_SNIP_CALCULATED\\"
+inputArgument = "F:\\P4_FISHNET_RESULT\\"
 
 print"Input Argument from SNIP_python: " + str(inputArgument)
     
@@ -103,7 +104,7 @@ from txtFileReadingFunctions import *
 ListWithWWTPCatchments = collectDataAllRunsBefore(inputArgument)   
 
 
-for pathCatchement in ListWithWWTPCatchments[1:]: 
+for pathCatchement in ListWithWWTPCatchments: 
     print("--------------------")
     print("Path Catchement : " + str(pathCatchement))
     
@@ -112,6 +113,7 @@ for pathCatchement in ListWithWWTPCatchments[1:]:
        
     # Iterate all SNIP Calculations
     folderListSNIPResults= get_immediate_subdirectories(pathCatchement)
+
     
     #print("folderListSNIPResults TTT:" + str(folderListSNIPResults))
     for SNIPcalculation in folderListSNIPResults:

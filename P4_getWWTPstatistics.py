@@ -235,14 +235,17 @@ def readInARETypologieDictionary(pathInFile):
 
 
 
-def getDensitiesCatchement(pathExtent_gem, pathBuildings_inhabited, pathSettArea):
+def getDensitiesCatchement(pathExtent_gem, pathBuildings_inhabited, pathSettArea, FISHNET):
     
     totSettlmentArea, totCatchmentArea, totPop = 0, 0, 0
     
     # Read in total Area & population
-    settlementAreaRows = arcpy.da.SearchCursor(pathExtent_gem, ["Shape_Area"])    
-    for i in settlementAreaRows:
-        totCatchmentArea = i[0]
+    if FISHNET == False:
+        settlementAreaRows = arcpy.da.SearchCursor(pathExtent_gem, ["Shape_Area"])    
+        for i in settlementAreaRows:
+            totCatchmentArea = i[0]
+    else:
+        totCatchmentArea = 7200 * 7200 # [m2]
         
     buildlingPop = arcpy.da.SearchCursor(pathBuildings_inhabited, ["Pop_Build"])    
     for i in buildlingPop:
@@ -288,25 +291,9 @@ def assignCatchementsToCanton(catchmentDictionaryNotSorted, kantonGeoBFS):
     #catchmentPerCanton
     
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
     def most_common(lst):
         return max(set(lst), key=lst.count)
-    
-    
-    
-    
-    
-    
-    
-    
+
     '''for i in catchmentDictionaryNotSorted:
         print("ENTRY: ---------------------: " + str(i))
         #print("len(catchmentPerCanton: " + str(len(catchmentPerCanton)))
@@ -379,9 +366,23 @@ def assignCatchementsToCanton(catchmentDictionaryNotSorted, kantonGeoBFS):
 # --------------------
 kantonGeoBFS = [[1, 'Zurich', 'ZH'], [2, 'Bern', 'BE'], [3, 'Luzern', 'LU'], [4, 'Uri', 'UR'], [5, 'Schwyz', 'SZ'], [6, 'Obwalden', 'OW'], [7, 'Nidwalden', 'NW'], [8, 'Glarus', 'GL'], [9, 'Zug', 'ZG'], [10, 'Freiburg', 'FR'], [11, 'Solothurn', 'SO'], [12, 'Basel-Stadt', 'BS'], [13, 'Basel-Landschaft', 'BL'], [14, 'Schaffhausen', 'SH'], [15, 'Appenzell Ausserrhoden', 'AR'], [16, 'Appenzell Innerrhoden', 'AI'], [17, 'St. Gallen', 'SG'], [18, 'Graubuenden', 'GR'], [19, 'Aargau', 'AG'], [20, 'Thurgau', 'TG'], [21, 'Tessin', 'TI'], [22, 'Waadt', 'VD'], [23, 'Wallis', 'VS'], [24, 'Neuenburg', 'NE'], [25, 'Genf','GE'], [26, 'Jura', 'JU']]
 
-FolderPath = r'P4_CH_SNIP_CALCULATED'
-pathResultFolder    = r'C:\\' + FolderPath + r'\\' # r'C:\\_SCRAP_FOLDERSTRUCTURE\\'  # Is the same as in datPerparatorCHF the main folder 
- 
+
+FISHNET = False
+
+if FISHNET == False:
+    FolderPath = r'P4_CH_SNIP_CALCULATED'
+    pathResultFolder    = r'C:\\' + FolderPath + r'\\' # r'C:\\_SCRAP_FOLDERSTRUCTURE\\'  # Is the same as in datPerparatorCHF the main folder 
+else:
+    FolderPath = r'P4_FISHNET_RESULT'
+    pathResultFolder    = r'F:\\' + FolderPath + r'\\'
+    
+    # ID, KT_ID
+    dictionaryFishNet = [[31, 21], [32, 21], [33, 21], [80, 21], [81, 21], [82, 21], [116, 23], [117, 23], [128, 21], [129, 21], [130, 21], [166, 23], [178, 21], [179, 21], [180, 21], [213, 23], [214, 23], [215, 23], [217, 23], [225, 21], [226, 21], [227, 21], [228, 21], [229, 21], [245, 25], [246, 25], [247, 25], [259, 23], [260, 23], [262, 23], [264, 23], [265, 23], [266, 23], [273, 21], [274, 21], [275, 21], [276, 21], [277, 21], [278, 21], [279, 18], [294, 25], [295, 25], [296, 25], [297, 25], [304, 23], [305, 22], [306, 22], [308, 23], [309, 23], [311, 23], [314, 23], [322, 21], [323, 21], [324, 21], [325, 21], [326, 21], [327, 18], [328, 18], [338, 18], [344, 25], [345, 22], [353, 23], [354, 22], [355, 22], [358, 23], [371, 21], [372, 21], [373, 21], [374, 21], [375, 21], [377, 18], [386, 18], [387, 18], [394, 22], [401, 23], [402, 22], [403, 22], [404, 22], [405, 2], [406, 2], [407, 2], [408, 2], [419, 21], [420, 21], [423, 21], [424, 21], [425, 21], [426, 18], [427, 18], [430, 18], [431, 18], [435, 18], [436, 18], [442, 22], [443, 22], [451, 22], [452, 22], [454, 22], [455, 2], [456, 2], [457, 2], [458, 2], [459, 2], [460, 2], [472, 21], [475, 18], [476, 18], [480, 18], [481, 18], [482, 18], [483, 18], [484, 18], [493, 22], [494, 22], [495, 22], [496, 22], [497, 22], [498, 22], [501, 10], [502, 10], [503, 22], [504, 2], [505, 2], [506, 2], [507, 2], [508, 2], [509, 2], [510, 2], [517, 21], [518, 21], [519, 21], [520, 21], [521, 21], [524, 18], [526, 18], [529, 18], [530, 18], [531, 18], [532, 18], [533, 18], [543, 22], [544, 22], [545, 22], [546, 22], [547, 22], [549, 10], [550, 10], [551, 10], [552, 10], [553, 2], [554, 2], [555, 2], [556, 2], [557, 2], [558, 2], [559, 2], [560, 2], [566, 21], [567, 21], [568, 21], [569, 18], [570, 21], [571, 21], [572, 18], [573, 18], [574, 18], [575, 18], [576, 18], [577, 18], [578, 18], [580, 18], [581, 18], [586, 18], [592, 22], [593, 22], [594, 22], [595, 22], [596, 22], [597, 10], [598, 10], [599, 10], [600, 10], [601, 10], [602, 10], [603, 2], [604, 2], [605, 2], [606, 2], [607, 2], [608, 2], [609, 2], [610, 2], [612, 2], [613, 2], [614, 4], [615, 4], [616, 4], [617, 18], [618, 18], [619, 18], [621, 18], [622, 18], [624, 18], [625, 18], [626, 18], [627, 18], [628, 18], [629, 18], [630, 18], [631, 18], [634, 18], [635, 18], [641, 22], [642, 22], [643, 22], [644, 22], [645, 22], [646, 22], [647, 10], [648, 10], [649, 10], [650, 10], [651, 10], [652, 2], [653, 2], [654, 2], [655, 2], [656, 2], [657, 2], [658, 2], [659, 2], [660, 2], [661, 2], [662, 2], [663, 2], [664, 4], [665, 4], [666, 18], [667, 18], [668, 18], [669, 18], [670, 18], [671, 18], [673, 18], [674, 18], [675, 18], [676, 18], [677, 18], [680, 18], [681, 18], [683, 18], [693, 22], [694, 22], [695, 22], [696, 22], [697, 10], [698, 10], [699, 10], [700, 2], [701, 2], [702, 2], [703, 2], [704, 2], [705, 2], [706, 2], [707, 2], [708, 2], [709, 6], [710, 2], [711, 2], [712, 2], [713, 4], [714, 4], [715, 4], [717, 18], [718, 18], [719, 18], [720, 18], [721, 18], [722, 18], [723, 18], [724, 18], [725, 18], [726, 18], [727, 18], [728, 18], [729, 18], [730, 18], [732, 18], [740, 22], [742, 22], [743, 22], [744, 10], [745, 22], [746, 10], [747, 10], [748, 10], [749, 10], [750, 2], [751, 2], [752, 2], [753, 2], [754, 2], [755, 2], [756, 3], [757, 6], [758, 6], [759, 6], [760, 7], [761, 6], [762, 4], [763, 4], [764, 4], [766, 8], [767, 8], [768, 18], [769, 18], [770, 18], [771, 18], [772, 18], [773, 18], [774, 18], [775, 18], [776, 18], [777, 18], [779, 18], [780, 18], [781, 18], [789, 24], [790, 24], [791, 22], [792, 22], [793, 22], [794, 10], [795, 22], [796, 10], [797, 10], [798, 2], [799, 2], [800, 2], [801, 2], [802, 2], [803, 2], [804, 2], [805, 3], [806, 3], [807, 6], [808, 6], [809, 7], [810, 7], [811, 4], [812, 4], [813, 4], [814, 4], [815, 4], [816, 8], [817, 8], [818, 8], [819, 18], [820, 18], [821, 18], [822, 18], [823, 18], [824, 18], [825, 18], [826, 18], [830, 18], [831, 18], [839, 24], [840, 24], [841, 24], [842, 24], [843, 22], [844, 22], [845, 10], [846, 2], [847, 2], [848, 2], [849, 2], [850, 2], [851, 2], [852, 2], [853, 2], [854, 3], [855, 3], [856, 6], [857, 6], [858, 7], [859, 7], [860, 7], [861, 5], [862, 5], [863, 5], [864, 5], [865, 8], [866, 8], [867, 8], [868, 17], [870, 17], [871, 18], [872, 18], [873, 18], [874, 18], [879, 18], [880, 18], [881, 18], [890, 24], [891, 24], [892, 24], [893, 24], [894, 2], [895, 2], [896, 2], [897, 2], [898, 2], [899, 2], [900, 2], [901, 2], [902, 2], [903, 3], [904, 3], [905, 3], [906, 3], [907, 3], [908, 3], [909, 5], [910, 5], [911, 5], [912, 5], [913, 8], [914, 8], [915, 8], [916, 8], [917, 17], [918, 17], [919, 17], [920, 18], [921, 18], [922, 18], [923, 18], [929, 18], [939, 24], [940, 24], [941, 24], [942, 24], [943, 2], [944, 2], [945, 2], [946, 2], [947, 2], [948, 2], [949, 2], [950, 2], [951, 2], [952, 3], [953, 3], [954, 3], [955, 3], [956, 3], [957, 5], [958, 5], [959, 5], [960, 5], [961, 5], [962, 5], [963, 8], [964, 8], [965, 17], [966, 17], [967, 17], [968, 17], [989, 2], [990, 2], [991, 2], [992, 2], [993, 2], [994, 2], [995, 2], [996, 11], [997, 11], [998, 11], [999, 2], [1000, 2], [1001, 3], [1002, 3], [1003, 3], [1004, 3], [1005, 3], [1006, 9], [1007, 9], [1008, 9], [1009, 5], [1010, 5], [1011, 5], [1012, 8], [1013, 17], [1014, 17], [1015, 17], [1016, 17], [1017, 17], [1039, 26], [1040, 26], [1041, 2], [1042, 2], [1043, 2], [1044, 11], [1045, 11], [1046, 11], [1047, 2], [1048, 2], [1049, 3], [1050, 3], [1051, 3], [1052, 3], [1053, 3], [1054, 19], [1055, 9], [1056, 9], [1057, 1], [1058, 1], [1059, 17], [1060, 5], [1061, 17], [1062, 17], [1063, 17], [1064, 17], [1065, 17], [1066, 17], [1089, 26], [1090, 26], [1091, 2], [1092, 2], [1093, 2], [1094, 11], [1095, 11], [1096, 2], [1097, 11], [1098, 19], [1099, 19], [1100, 19], [1101, 19], [1102, 3], [1103, 19], [1104, 1], [1105, 1], [1106, 1], [1107, 1], [1108, 1], [1109, 1], [1110, 17], [1111, 17], [1112, 17], [1113, 15], [1114, 16], [1115, 17], [1116, 17], [1137, 26], [1138, 26], [1139, 26], [1140, 26], [1141, 26], [1142, 26], [1143, 26], [1144, 11], [1145, 11], [1146, 13], [1147, 11], [1148, 11], [1149, 19], [1150, 19], [1151, 19], [1152, 19], [1153, 1], [1154, 1], [1155, 1], [1156, 1], [1157, 1], [1158, 1], [1159, 17], [1160, 17], [1161, 17], [1162, 15], [1163, 16], [1164, 16], [1165, 17], [1186, 26], [1187, 26], [1188, 26], [1189, 26], [1190, 26], [1191, 11], [1192, 13], [1193, 11], [1194, 13], [1195, 13], [1196, 13], [1197, 11], [1198, 19], [1199, 19], [1200, 19], [1201, 19], [1202, 1], [1203, 1], [1204, 1], [1205, 1], [1206, 1], [1207, 20], [1208, 17], [1209, 17], [1210, 17], [1211, 17], [1212, 15], [1213, 15], [1214, 17], [1215, 17], [1236, 26], [1237, 26], [1238, 26], [1240, 11], [1241, 11], [1242, 13], [1243, 11], [1244, 13], [1245, 13], [1246, 19], [1247, 19], [1248, 19], [1249, 19], [1250, 19], [1251, 1], [1252, 1], [1253, 1], [1254, 1], [1255, 1], [1256, 20], [1257, 17], [1258, 17], [1259, 17], [1260, 17], [1261, 17], [1262, 17], [1263, 17], [1264, 17], [1290, 13], [1291, 12], [1292, 13], [1293, 19], [1294, 19], [1295, 19], [1296, 19], [1297, 19], [1298, 19], [1299, 19], [1300, 1], [1301, 1], [1302, 1], [1303, 1], [1304, 1], [1305, 20], [1306, 20], [1307, 20], [1308, 20], [1309, 20], [1310, 20], [1340, 12], [1341, 12], [1346, 19], [1347, 19], [1350, 1], [1351, 1], [1352, 1], [1353, 20], [1354, 20], [1355, 20], [1356, 20], [1357, 20], [1358, 20], [1398, 14], [1399, 14], [1400, 1], [1401, 20], [1402, 20], [1403, 20], [1404, 20], [1405, 20], [1406, 20], [1447, 14], [1448, 14], [1449, 14], [1450, 20], [1451, 20], [1497, 14]]
+
+
+
+
+
 pathToGeoDictionary = r'Q:\\Abteilungsprojekte\eng\SWWData\Eggimann_Sven\07-Fallbeispiele\04-finalCH\dictionaryGEO.txt'
 pathToAreTypologieDictionary = r'Q:\\Abteilungsprojekte\eng\SWWData\Eggimann_Sven\07-Fallbeispiele\04-finalCH\LOOKUPAREGEMTYP_DICTIONARY.txt'
 pathResults = "GIS_PYTHON\\"
@@ -397,7 +398,6 @@ sys.path.append(pythonScriptPath)                           # Append paths
 
 # Import Geo of all Catchements ([BFS_NUMMER, KANTONSNUM, NAME, ARA_Nr, ARA_Name])
 catchmentDictionaryNotSorted = readInGeoDictionary(pathToGeoDictionary)
-
 print("LnethcatchmentDictionaryNotSorted: " + str(len(catchmentDictionaryNotSorted)))
 
 # Get one community for each catchement which is in the dominant canton
@@ -405,7 +405,6 @@ print("LnethcatchmentDictionaryNotSorted: " + str(len(catchmentDictionaryNotSort
 #print("Number of catchements: " + str(len(catchmentDictionary)))
 
 catchmentDictionary = catchmentDictionaryNotSorted
-
 
 # CAN BE USED FOR ARA
 areTypologie = readInARETypologieDictionary(pathToAreTypologieDictionary) #TYP, NAME, KT_NO, BFS_N
@@ -439,7 +438,12 @@ for pathCatchement in ListWithWWTPCatchments:
     pathExtent_gem = pathCatchement + "\\" + "extent_gem.shp"
     pathBuildings_inhabited = pathCatchement + "\\" + "buildings_inhabited.shp"
     pathSettArea =pathCatchement + "\\" + "settlementArea.shp"
-    regularpopDensity, NeighborhoodDensity, totCatchmentArea, totPopCatchement, totSettlmentAreaCatchement = getDensitiesCatchement(pathExtent_gem, pathBuildings_inhabited, pathSettArea)
+    
+    #print("pathExtent_gem: " + str(pathExtent_gem))
+    #print("pathBuildings_inhabited: " + str(pathBuildings_inhabited))
+    #print("pathSettArea: " + str(pathSettArea))
+    
+    regularpopDensity, NeighborhoodDensity, totCatchmentArea, totPopCatchement, totSettlmentAreaCatchement = getDensitiesCatchement(pathExtent_gem, pathBuildings_inhabited, pathSettArea, FISHNET)
     
     # ---------------------
     # Iterate SNIP Folders (mainly to get standard deviation)
@@ -529,81 +533,158 @@ for pathCatchement in ListWithWWTPCatchments:
     ''' 
     # Find Geography in Dictionary
     for i in catchmentDictionary:
-        #print("FLOL: " + str(i))
-        #print("ARA_NR: " + str(ARA_NR))
-        #if i[3] == ARA_NR:
-        if i[1] == ARA_NR:
-            #print("ADD")
-            
-            # Adds for every community the statistics for the whole catchement
-            #gemeindeNr, kantonNr =  i[0], i[1]
-            gemeindeNr, kantonNr =  0.00, i[0] 
+        
+        # if fishnet --> Get Canton of fishnet ID
+        # --------------------------------------
+        if FISHNET == True:
+            fishnetID = ARA_NR            
+            for fishnet in dictionaryFishNet: #FISHID, KT_ID
                 
-            for kt in kantonGeoBFS:
-                if kt[0] == kantonNr:
-                    ktLabel = kt[2]
-                    break
+                if fishnet[0] == ARA_NR:
+                    fishKT = fishnet[1]
                     
-            statCatchement = [
+                    for kt in kantonGeoBFS:
+                        if kt[0] == fishKT:
+                            ktLabel = kt[2]
+                            break
                     
-                    # Infos
-                    ARA_NR, 
-                    kantonNr, 
-                    ktLabel, 
-                    gemeindeNr, 
-                    regularpopDensity, 
-                    NeighborhoodDensity, 
-                    totCatchmentArea, 
-                    totPopCatchement, 
-                    totSettlmentAreaCatchement, 
+            if True == True:
+                print("ARA_NR: " + str(ARA_NR))
+                
+                # Adds for every community the statistics for the whole catchement
+                #gemeindeNr, kantonNr =  i[0], i[1]
+                gemeindeNr, kantonNr =  0.00, fishKT 
                     
-                    # Standard Scenario
-                    slopeCriteria_standardScenario,          
-                    Z_SNIP_standardScenario, 
-                    Z_weighted_SNIP_standardScenario, 
-                    percentageSmallWWTP_SNIP_standardScenario, 
-                    percentageMiddle_SNIP_standardScenario, 
-                    percentageLarge_SNIP_standardScenario, 
+                statCatchement = [
+                        
+                        # Infos
+                        ARA_NR, 
+                        kantonNr, 
+                        ktLabel, 
+                        gemeindeNr, 
+                        regularpopDensity, 
+                        NeighborhoodDensity, 
+                        totCatchmentArea, 
+                        totPopCatchement, 
+                        totSettlmentAreaCatchement, 
+                        
+                        # Standard Scenario
+                        slopeCriteria_standardScenario,          
+                        Z_SNIP_standardScenario, 
+                        Z_weighted_SNIP_standardScenario, 
+                        percentageSmallWWTP_SNIP_standardScenario, 
+                        percentageMiddle_SNIP_standardScenario, 
+                        percentageLarge_SNIP_standardScenario, 
+                        
+                        # Slope 0.5 Scenario
+                        slopeCriteria_scenario05,
+                        Z_SNIP_scenario05,
+                        Z_weighted_SNIP_scenario05,
+                        percentageSmallWWTP_SNIP_scenario05,
+                        percentageMiddle_SNIP_scenario05,
+                        percentageLarge_SNIP_scenario05,
+                        
+                        # Slope 1.5 Scenario
+                        slopeCriteria_scenario15,
+                        Z_SNIP_scenario15,
+                        Z_weighted_SNIP_scenario15,
+                        percentageSmallWWTP_SNIP_scenario15,
+                        percentageMiddle_SNIP_scenario15,
+                        percentageLarge_SNIP_scenario15,
+                
+                        # Std Deviation for individual catchements
+                        stdv_Z_SNIP, 
+                        stdv_Z_weighted_SNIP, 
+                        stdv_percentageSmallWWTP_SNIP, 
+                        stdv_percentageMiddle_SNIP, 
+                        stdv_percentageLarge_SNIP
+                        ]
+                
+                print("statCatchement: " + str(statCatchement))        
+                # Append Statistics to canton
+                statisticsPerCatchement.append(statCatchement)
+                break        
                     
-                    # Slope 0.5 Scenario
-                    slopeCriteria_scenario05,
-                    Z_SNIP_scenario05,
-                    Z_weighted_SNIP_scenario05,
-                    percentageSmallWWTP_SNIP_scenario05,
-                    percentageMiddle_SNIP_scenario05,
-                    percentageLarge_SNIP_scenario05,
-                    
-                    # Slope 1.5 Scenario
-                    slopeCriteria_scenario15,
-                    Z_SNIP_scenario15,
-                    Z_weighted_SNIP_scenario15,
-                    percentageSmallWWTP_SNIP_scenario15,
-                    percentageMiddle_SNIP_scenario15,
-                    percentageLarge_SNIP_scenario15,
+  
             
-                    # Std Deviation for individual catchements
-                    stdv_Z_SNIP, 
-                    stdv_Z_weighted_SNIP, 
-                    stdv_percentageSmallWWTP_SNIP, 
-                    stdv_percentageMiddle_SNIP, 
-                    stdv_percentageLarge_SNIP
-                    ]
+        
+        else:#print("FLOL: " + str(i))
+            #print("ARA_NR: " + str(ARA_NR))
+            #if i[3] == ARA_NR:
+            if i[1] == ARA_NR:
+                print("ARA_NR: " + str(ARA_NR))
+                
+                # Adds for every community the statistics for the whole catchement
+                #gemeindeNr, kantonNr =  i[0], i[1]
+                gemeindeNr, kantonNr =  0.00, i[0] 
                     
-            # Append Statistics to canton
-            statisticsPerCatchement.append(statCatchement)
-            break
+    
+                for kt in kantonGeoBFS:
+                    if kt[0] == kantonNr:
+                        ktLabel = kt[2]
+                        break
+                        
+                statCatchement = [
+                        
+                        # Infos
+                        ARA_NR, 
+                        kantonNr, 
+                        ktLabel, 
+                        gemeindeNr, 
+                        regularpopDensity, 
+                        NeighborhoodDensity, 
+                        totCatchmentArea, 
+                        totPopCatchement, 
+                        totSettlmentAreaCatchement, 
+                        
+                        # Standard Scenario
+                        slopeCriteria_standardScenario,          
+                        Z_SNIP_standardScenario, 
+                        Z_weighted_SNIP_standardScenario, 
+                        percentageSmallWWTP_SNIP_standardScenario, 
+                        percentageMiddle_SNIP_standardScenario, 
+                        percentageLarge_SNIP_standardScenario, 
+                        
+                        # Slope 0.5 Scenario
+                        slopeCriteria_scenario05,
+                        Z_SNIP_scenario05,
+                        Z_weighted_SNIP_scenario05,
+                        percentageSmallWWTP_SNIP_scenario05,
+                        percentageMiddle_SNIP_scenario05,
+                        percentageLarge_SNIP_scenario05,
+                        
+                        # Slope 1.5 Scenario
+                        slopeCriteria_scenario15,
+                        Z_SNIP_scenario15,
+                        Z_weighted_SNIP_scenario15,
+                        percentageSmallWWTP_SNIP_scenario15,
+                        percentageMiddle_SNIP_scenario15,
+                        percentageLarge_SNIP_scenario15,
+                
+                        # Std Deviation for individual catchements
+                        stdv_Z_SNIP, 
+                        stdv_Z_weighted_SNIP, 
+                        stdv_percentageSmallWWTP_SNIP, 
+                        stdv_percentageMiddle_SNIP, 
+                        stdv_percentageLarge_SNIP
+                        ]
+                
+                print("statCatchement: " + str(statCatchement))        
+                # Append Statistics to canton
+                statisticsPerCatchement.append(statCatchement)
+                break
     #prnt("..")
 
 print("-----------------------------------------------------------")
 print("Number of catchements read in: " + str(len(statisticsPerCatchement)))
 print("-----------------------------------------------------------")
 
-'''print"FINISHED"
+print"FINISHED"
 for i in statisticsPerCatchement:
     print(i)
     #print"----------"
-prnt("..")
-'''
+#prnt("..")
+
 
 # ---------------------------------------------------------------------------
 # Create Graphs
@@ -612,11 +693,11 @@ from P4_barcharts import *
 from P4_figureDensityCatchement import *
 
 # PLot Figure with all WWTPs
-#print(" Print all catchements of a canton")
-#plotAllCatchements(statisticsPerCatchement, ['LU'])
+print(" Print all catchements of a canton")
+#plotAllCatchements(statisticsPerCatchement, ['ZH'])
 
 # Plot Figure with Cnatons and percetnages 
-##plotFigureCantons3Classes(statisticsPerCatchement)
+#plotFigureCantons3Classes(statisticsPerCatchement)
 
 
 # PLot Densitiey and percentage for catchements

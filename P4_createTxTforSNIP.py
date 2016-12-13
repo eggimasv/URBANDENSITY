@@ -51,12 +51,14 @@ arcpy.env.overwriteOutput = True
 
 # ArcGIS System Arguments
 pathFoldersWithCatchements = r'C:\\P4_CH_NEU\\'
-
+pathFoldersWithCatchements = r'F:\\P4_GEMEINDEN\\'
+pathFoldersWithCatchements = r'F:\\P4_FISHNET\\'
+pathFoldersWithCatchements = r'F:\\P4_FISHNET_NEU\\'
 
 
 ListWithWWTPCatchments = collectDataAllRunsBefore(pathFoldersWithCatchements)   
 
-for txtFileInputPath in ListWithWWTPCatchments:# --> bis 298 ok.
+for txtFileInputPath in ListWithWWTPCatchments[166:167]: #[166:167]: #296   [110:]:# --> bis 298 ok.
     print("txtFileInputPath: " + str(txtFileInputPath))
     print("--------------------------------------------")
         

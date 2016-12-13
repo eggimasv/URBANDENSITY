@@ -9,6 +9,39 @@ from tkMessageBox import IGNORE
 # This files creates urban blocksize
 #
 # -----------------------------------
+
+    
+def removeShapeFile(path):
+        os.remove(path)
+        os.remove(path[:-3] + "dbf")
+        try:
+            os.remove(path[:-3] + "prj")
+        except:
+            #no file
+            print"not prj file"       
+        try:
+            os.remove(path[:-3] + "sbn")
+        except:
+            #no file
+            print"not sbn file"
+        os.remove(path[:-3] + "cpg")
+        try:
+            os.remove(path[:-3] + "sbx")
+        except:
+            #no file
+            print"not sbx file"    
+        try:
+            os.remove(path[:-3] + "shp.xml")
+        except:
+            #no file
+            print"not shp.xml file" 
+        try:    
+            os.remove(path[:-3] + "shx")
+        except:
+            #no file
+            print"not shx file" 
+        return
+    
 def collectDataAllRuns(path):
     '''
     Collects 
@@ -18,7 +51,7 @@ def collectDataAllRuns(path):
     
     # Get the folders
     folderList = os.listdir(path) 
-    for folder in folderList[:-1]:
+    for folder in folderList: #[:-1]:
         resultFolder.append(path[:-1] + folder)
 
     return resultFolder
@@ -90,8 +123,10 @@ print("---------------------------")
 # Path to SEGME.exe of GME
 pathToSEGME = r'C:\Users\eggimasv\AppData\Local\Apps\2.0\BN23RV48.G12\9DDGL0P7.2AJ\segm..tion_c23e290fb11c064b_0001.0000_143886b27f0a8c90\SEGME.exe'
 
-pathForGMECommands = r'C:\\P4_CH_NEU\\'
-
+#pathForGMECommands = r'C:\\P4_CH_NEU\\'
+#pathForGMECommands = r'F:\\P4_GEMEINDEN\\' #GEMEINDEN
+pathForGMECommands = r'F:\\P4_FISHNET\\' #GEMEINDEN
+pathForGMECommands = r'F:\\P4_FISHNET_NEU\\' #GEMEINDEN
 
 # Global Variables
 EW_Q = 0.162                                # [m3 / day] 1 EW is equal to 162 liter. This factor must be the same as for the GIS-Files
@@ -122,17 +157,20 @@ if afterGME == False:
 else:
     ListWithWWTPCatchments = collectDataAllRuns(pathForGMECommands)
     
-    '''
-    cnt = 0
-    for i in ListWithWWTPCatchments:
-        if i == "C:\\\\P4_CH\\359501" #300501":
-            print("POSITION IN LSIt: " + str(cnt)) #179  , [179:180]
-        
-        cnt += 1
-    '''
+ 
+'''cnt = 0
+for i in ListWithWWTPCatchments:
+    print i
+    print cnt
+    if i == "F:\\P4_GEMEINDEN_NEU\386": #"F:\\P4_GEMEINDEN\5812": #300501": 
+        print("POSITION IN LSIt: " + str(cnt)) #179  , [179:180]
+        prnt("...")
+    cnt += 1
+prnt("...")
+'''
 
 # SCRAP
-ListWithWWTPCatchments = ListWithWWTPCatchments #[514:] #[252:] #[181:] #[179:180]
+ListWithWWTPCatchments = ListWithWWTPCatchments[166:] #[617:] #[322:323]  #[323     :105] # [1559:] #[252:] #[181:] #[179:180]
 print(ListWithWWTPCatchments)
     
 
@@ -149,7 +187,46 @@ for pathCatchement in ListWithWWTPCatchments:
     pathSettlementArea = str(pathCatchement) + "\\" + "settlementArea.shp"
     pathBuildings = str(pathCatchement) + "\\" + "buildings_inhabited.shp"
     pathstreetRailMerge = pathCatchement + "\\" + "streetRailMerge.shp"
-      
+    
+    
+    '''#SCRAP REMOVE Z VALUES
+    #--------------------------------------
+    pathstreetRailMergeNEU=pathCatchement + "\\" + "streetRailMergeNOZ.shp"
+    pathSettlementAreaNEU = str(pathCatchement) + "\\" + "settlementArea.shp"
+    arcpy.env.workspace = pathCatchement
+    arcpy.env.outputZFlag = "Disabled"
+    arcpy.FeatureClassToGeodatabase_conversion([pathstreetRailMerge, pathSettlementArea], pathCatchement)
+    
+    #removeShapeFile(pathstreetRailMerge)
+    #removeShapeFile(pathSettlementArea)
+    #arcpy.DeleteFeatures_management(pathstreetRailMerge)
+    #arcpy.DeleteFeatures_management(pathSettlementArea)
+    
+    #arcpy.Rename_management(pathCatchement + "\\" + "streetRailMerge_1.shp", pathstreetRailMerge)
+    #arcpy.Rename_management(pathCatchement + "\\" + "settlementArea_1.shp", pathSettlementArea)
+    #prnt(":.")
+    continue
+    '''
+    
+    
+    ''' # Update X
+    # Update X and Y Coordinate (X_Point, Y_Point)
+    # Update X
+    # Update X and Y Coordinate (X_Point, Y_Point)
+
+    startX = "!Shape!.positionAlongLine(0.0,True).firstPoint.X"
+    startY = "!Shape!.positionAlongLine(0.0,True).firstPoint.Y"
+    endX ="!Shape!.positionAlongLine(1.0,True).firstPoint.X"
+    endY ="!Shape!.positionAlongLine(1.0,True).firstPoint.Y"
+    
+    arcpy.CalculateField_management(pathstreetRailMerge, "START_X", startX, "PYTHON")
+    arcpy.CalculateField_management(pathstreetRailMerge, "START_Y", startY, "PYTHON")
+    arcpy.CalculateField_management(pathstreetRailMerge, "END_X", endX, "PYTHON")
+    arcpy.CalculateField_management(pathstreetRailMerge, "END_Y", endY, "PYTHON")      
+    #prnt(":..")
+    continue
+    '''
+    
     if afterGME == False:
         print("------------------------------------------------")
         print("Path WWTP Catchements: " + str(pathCatchement))
@@ -197,8 +274,9 @@ for pathCatchement in ListWithWWTPCatchments:
         #lineGME = '"' + pathstreetRailMerge + "\\" + '"'          
         #outGME = '"' + str(pathCatchement) + "\\" + nameUSUfile + ".shp" + "\\" + '"'
         
+         
         areaGME = '"' + pathSettlementArea + '"'                  
-        lineGME = '"' + pathstreetRailMerge + '"'          
+        lineGME = '"' + pathstreetRailMerge + '"' 
         outGME = '"' + str(pathCatchement) + "\\" + nameUSUfile + ".shp" + '"'
         
         inputCodeBackSlash = pathToSEGME + ' -c ' + 'geom.splitpolysbylines(in=\\' + areaGME + ', line=\\' + lineGME + ', out=\\' + outGME + r');' # Create Path

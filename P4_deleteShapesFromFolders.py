@@ -4,6 +4,7 @@ import os
 import shutil
     
 pathFoldersWithCatchements = r'C:\\P4_CH_NEU\\'
+pathFoldersWithCatchements = r'F:\\P4_FISHNET_NEU\\'
 
 def collectDataAllRunsBefore(path):
     '''

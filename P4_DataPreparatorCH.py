@@ -7,18 +7,21 @@ import os
 
 # Inputs
 #pathToGenerateFolderStructure = "C:\P4_CH_NEU"   
-pathToGenerateFolderStructure = "C:\P4_GEMEINDEN" #GEMEINDEN         
+#pathToGenerateFolderStructure = "F:\P4_GEMEINDEN" #GEMEINDEN         
+pathToGenerateFolderStructure = "F:\P4_FISHNET_NEU" #GEMEINDEN     
+
 inputShapeCHPaths = "Q:\\Abteilungsprojekte\\eng\\SWWData\\Eggimann_Sven\\07-Fallbeispiele\\04-finalCH"  # Path with WWTP Catchements
 
 inputShapeWithWWTP = inputShapeCHPaths + "\\" + "WWTP_catchements2014_ALLDATA.shp"  # Path with WWTP Catchements 
-inputShapeWithWWTPNEwGeometry = inputShapeCHPaths + "\\" + "01GemeindeCalculations" + "\\" + "Gemeinden_GeometrieCH.shp"  # Path with WWTP Catchements #GEMEINDEN
-
+#inputShapeWithWWTPNEwGeometry = inputShapeCHPaths + "\\" + "01GemeindeCalculations" + "\\" + "Gemeinden_GeometrieCH.shp"  # Path with WWTP Catchements #GEMEINDEN
+inputShapeWithWWTPNEwGeometry = inputShapeCHPaths + "\\" + "02RasterCalculations" + "\\" + "fisnhet7200_data_selection.shp"  # Path with WWTP Catchements #GEMEINDEN
 
 
 # Create Main Folder
 os.mkdir(pathToGenerateFolderStructure)                         # Create Main Folder
 #rows = arcpy.da.SearchCursor(inputShapeWithWWTP, ["ARA_Nr"])    # Read WWTP numbers
-rows = arcpy.da.SearchCursor(inputShapeWithWWTPNEwGeometry, ["BFS_NUMMER"])    # Read WWTP numbers #GEMEINDEN       
+#rows = arcpy.da.SearchCursor(inputShapeWithWWTPNEwGeometry, ["BFS_NUMMER"])    # Read WWTP numbers #GEMEINDEN       
+rows = arcpy.da.SearchCursor(inputShapeWithWWTPNEwGeometry, ["FISH_ID"])    # Read WWTP numbers #GEMEINDEN       
 
 # ------------------------
 # Assign Coordinages of CH shapefiles
@@ -26,12 +29,42 @@ rows = arcpy.da.SearchCursor(inputShapeWithWWTPNEwGeometry, ["BFS_NUMMER"])    #
 SwisscordSys = arcpy.SpatialReference(21781) # EPSG:21781 ,CH1903 / LV03 # Swiss Coordinate System
 scrapcnt= 0
 
+'''cnt = 0
+for i in rows:
+    #print i
+    if i[0] == 406:
+        print("CNT: FOUND; " + str(cnt))
+    cnt += 1
+prnt(":..")
+'''
+
+ccc = 0
 for row in rows:
+    
+    # scrap
+    '''if ccc < 322: #fishnet 72, 73
+        ccc += 1
+        continue
+    '''
+        
     
     # Create Folder
     Ara_ID = row[0]
+    print("Ara_ID: " + str(Ara_ID))
     folderARAID = pathToGenerateFolderStructure + "\\" + str(int(Ara_ID))
-    os.mkdir(folderARAID)
+    
+    #os.mkdir(folderARAID)
+    exit = False
+    while exit == False:
+        newFolderID = 1
+        try:
+            print("Created Gemeinde Enklave NR: " + str(Ara_ID))
+            os.mkdir(folderARAID)
+            exit = True
+        except:
+            print("Already created Gemeinde: " + str(Ara_ID))
+            folderARAID = str(folderARAID) + str(1000) + str(newFolderID)
+            newFolderID += 1
     
     print("-------------------------------------------")
     print("Made Folder with AraID: " + str(folderARAID))
@@ -42,7 +75,7 @@ for row in rows:
     WWTPgeometry = inputShapeWithWWTPNEwGeometry #Gemeinden
     
     DEM_CH = inputShapeWithWWTP + "\\" + "CH_dem100.shp"
-    street_CH = inputShapeWithWWTP + "\\" + "CH_Street25_NEU_simplified.shp"
+    street_CH = inputShapeWithWWTP + "\\" + "CH_Street25_NEU_simplified_Clip.shp"
     geb_CH = inputShapeWithWWTP + "\\" + "CH_buildings_data_ARA_pt_inhabited.shp"
     railroad_CH = inputShapeWithWWTP + "\\" + "CH_railroad.shp"
     settlement_CH = inputShapeWithWWTP + "\\" + "CH_settlementArea.shp"
@@ -59,7 +92,8 @@ for row in rows:
     # Select ARA Catchement
     arcpy.MakeFeatureLayer_management(WWTPgeometry, "lyr") 
     #selectionCatchement = arcpy.SelectLayerByAttribute_management("lyr", "NEW_SELECTION", "ARA_NR = " + str(Ara_ID))
-    selectionCatchement = arcpy.SelectLayerByAttribute_management("lyr", "NEW_SELECTION", "BFS_NUMMER = " + str(Ara_ID)) #GEmeinden
+    #selectionCatchement = arcpy.SelectLayerByAttribute_management("lyr", "NEW_SELECTION", "BFS_NUMMER = " + str(Ara_ID)) #GEmeinden
+    selectionCatchement = arcpy.SelectLayerByAttribute_management("lyr", "NEW_SELECTION", "FISH_ID = " + str(Ara_ID)) #GEmeinden
     arcpy.CopyFeatures_management("lyr", extent_f)              # Export catchment extent
     
     #For DEM, create a rectangle around extent for clip
@@ -91,4 +125,3 @@ for row in rows:
     
     # Delete Layer Field
     arcpy.Delete_management("lyr")
-    prnt(":..")
